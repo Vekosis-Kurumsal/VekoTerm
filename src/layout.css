@@ -1,0 +1,160 @@
+/* VekoTerm 0.4 — MobaXterm düzeni. Renk belirteçleri style.css'tedir; burada yalnız yerleşim ve yeni parçalar var.
+   Sıra: başlık, menü, araç çubuğu, hızlı bağlan + sekmeler, sol şerit, bağlantı ağacı, ana alan, izleme, durum satırı. */
+:root{--icon-local:#93abd6;--icon-star:#e3b86e;--icon-folder:#dcab5c;--icon-violet:#bba0de;--icon-blue:#86aef0;--icon-green:#83bd9a;--icon-red:#ef8d94;--danger-text:#ef8d94;--danger-bg:#3b2026;--warn-text:#e9bd63;--ok-text:#80cd93;--chrome:#141a21;--popup:#1d2530}
+:root[data-theme=light]{--icon-local:#43649e;--icon-star:#a26a12;--icon-folder:#b07a1e;--icon-violet:#7650a8;--icon-blue:#2d5fb5;--icon-green:#2f7a4a;--icon-red:#c0343f;--danger-text:#b8323d;--danger-bg:#fbe4e6;--warn-text:#8d6100;--ok-text:#1f7438;--chrome:#eef2f6;--popup:#ffffff}
+:root[data-theme=light] :is(.quick-row,.side-rail,.statusbar,.menu-popup,.remote-monitor,.session-notice){--text:#1f2c3d;--muted:#3f5065;--subtle:#526176;--accent:#086b55}
+
+/* Başlık */
+.app-shell .titlebar{height:32px;background:var(--chrome)}
+.app-shell .brand{width:auto;padding-left:10px;gap:8px}
+.app-shell .brand-mark{width:20px;height:20px;border-radius:5px;display:grid;place-items:center;background:var(--accent);color:var(--bg)}
+.app-shell .brand strong{font-size:14px;letter-spacing:-.2px}
+.app-shell .brand strong>span{color:var(--accent);font-weight:500}
+.app-shell .title-context{display:block;font-size:12px;color:var(--muted);padding-left:18px}
+.app-shell .window-controls{margin-left:auto}
+
+/* Menü */
+.app-shell .menubar{height:26px;padding:0 4px;gap:0;background:var(--chrome);border-bottom:1px solid var(--line);color:var(--text);font-size:12px;position:relative;z-index:70}
+.menu-root{position:relative;height:100%}
+.menu-root>button{height:100%;padding:0 10px;border-radius:0;color:var(--text)}
+.menu-root>button[aria-expanded=true]{background:var(--hover)}
+.app-shell .menu-note{font-size:11px;color:var(--muted);margin-right:10px}
+.app-shell .menu-note .dot{width:6px;height:6px}
+.menu-popup{position:absolute;top:100%;left:0;min-width:250px;padding:4px;background:var(--popup);border:1px solid var(--line);border-radius:0 0 7px 7px;box-shadow:var(--shadow);display:flex;flex-direction:column}
+.menu-popup button{display:flex;align-items:center;gap:9px;padding:6px 10px 6px 8px;border-radius:4px;text-align:left;color:var(--text);white-space:nowrap;font-size:12px}
+.menu-popup button:disabled{opacity:.4}
+.menu-popup .menu-icon{width:16px;display:grid;place-items:center;color:var(--muted)}
+.menu-popup button.danger,.menu-popup button.danger .menu-icon{color:var(--danger-text)}
+.menu-popup button.danger:hover:not(:disabled){background:var(--danger-bg)}
+.menu-popup kbd{margin-left:auto;padding-left:18px;border:0;background:none;color:var(--subtle);font-size:11px}
+.menu-popup hr{border:0;border-top:1px solid var(--line);margin:4px 2px;width:auto}
+
+/* Büyük simgeli araç çubuğu */
+.app-shell .toolbar{height:62px;padding:3px 6px;gap:1px;background:var(--toolbar)}
+.app-shell .tool-button{height:54px;min-width:60px;padding:3px 8px;gap:3px;border-radius:6px;font-size:11px;color:var(--text)}
+.app-shell .tool-button .tool-icon{height:26px;color:var(--muted)}
+.app-shell .tool-button.selected{background:var(--accent-bg);color:var(--text)}
+.app-shell .tool-divider{height:38px;margin:0 5px}
+[data-compact=true] .app-shell .toolbar{height:36px}
+[data-compact=true] .app-shell .tool-button{height:30px;flex-direction:row;gap:6px;min-width:0}
+[data-compact=true] .app-shell .tool-button .tool-icon{height:20px}
+[data-compact=true] .app-shell .tool-button .tool-icon svg{width:17px;height:17px}
+
+/* Hızlı bağlan + sekmeler */
+.quick-row{display:flex;height:31px;flex-shrink:0;background:var(--chrome);border-bottom:1px solid var(--line)}
+.quick-connect{flex-shrink:0;display:flex;align-items:center;gap:6px;padding:0 8px;border-right:1px solid var(--line);color:var(--subtle);min-width:0}
+.quick-connect input{flex:1;min-width:0;height:23px;padding:0 6px;border:1px solid var(--line);border-radius:4px;background:var(--input);font-size:12px;outline:none}
+.quick-connect input:focus{border-color:var(--accent)}
+.quick-row .tabbar{flex:1;height:100%;border-bottom:0;background:transparent;min-width:0}
+.quick-row .tab{min-width:120px;max-width:240px;font-size:12px;gap:2px;border-top-width:2px}
+.quick-row .tab.active{color:var(--text)}
+.quick-row .tab-label{gap:6px;padding:0 6px 0 10px}
+.quick-row .tab-label .tab-number{color:var(--subtle);font-variant-numeric:tabular-nums;flex-shrink:0}
+.quick-row .tab-label .tab-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.quick-row .home-tab{min-width:42px;width:42px;padding:0;justify-content:center}
+.quick-row .new-tab{width:34px;display:grid;place-items:center}
+.connection-dot.closed{background:var(--warn-text)}
+
+/* Sol dikey şerit */
+.app-shell .side-rail{width:38px;height:auto;flex-shrink:0;flex-direction:column;gap:2px;padding:4px 0;border-bottom:0;border-right:1px solid var(--line);background:var(--chrome)}
+.app-shell .side-rail>button{height:40px;padding:0;justify-content:center;border-bottom:0;border-left:2px solid transparent;border-radius:0;color:var(--muted)}
+.app-shell .side-rail>button.selected{border-left-color:var(--accent);color:var(--accent);background:var(--panel)}
+.side-rail .rail-spacer{flex:1}
+.app-shell .sidebar{border-right:0}
+.sidebar .panel-head{display:flex;align-items:center;gap:1px;height:34px;flex-shrink:0;padding:0 6px 0 10px;border-bottom:1px solid var(--line)}
+.sidebar .panel-head strong{margin-right:auto;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.panel-icon{width:26px;height:26px;border-radius:4px;display:grid;place-items:center;color:var(--muted)}
+.panel-icon.selected{color:var(--icon-star);background:var(--accent-bg)}
+.panel-search{display:flex;align-items:center;gap:6px;margin:6px 8px;padding:0 8px;height:28px;border:1px solid var(--line);border-radius:5px;background:var(--input);color:var(--subtle);flex-shrink:0}
+.panel-search input{flex:1;min-width:0;border:0;background:none;outline:none;font-size:12px}
+.panel-search:focus-within{border-color:var(--accent)}
+
+/* Bağlantı ağacı */
+.connection-panel{display:flex;flex-direction:column;flex:1;min-height:0}
+.connection-panel .session-tree{padding:2px 0 8px}
+.connection-panel .tree-root{display:flex;align-items:center;gap:6px;width:100%;height:26px;padding:0 10px;font-size:12px;font-weight:600;color:var(--muted);text-align:left}
+.connection-panel .tree-root svg{color:var(--icon-star)}
+.connection-panel .tree-root small,.connection-panel .folder-heading>small{font-size:11px;color:var(--subtle);font-weight:400;font-variant-numeric:tabular-nums}
+.connection-panel .tree-root.selected{background:var(--accent-bg)}
+.connection-panel .tree-folder{margin:0}
+.connection-panel .customer-heading{height:26px;border-radius:0;gap:0}
+.connection-panel .customer-heading.selected{background:var(--accent-bg)}
+.connection-panel .customer-heading .folder-heading{height:26px;gap:5px;padding-left:16px;font-size:12.5px;font-weight:600;border-radius:0}
+.connection-panel .folder-heading>svg:first-child{color:var(--subtle)}
+.connection-panel .folder-heading .folder-icon{color:var(--icon-folder)}
+.connection-panel .folder-heading>span{flex:0 1 auto}
+.connection-panel .folder-actions{display:none}
+.connection-panel .customer-heading:is(:hover,:focus-within) .folder-actions{display:flex}
+.connection-panel .folder-actions>button{width:22px;height:22px}
+.connection-panel .folder-connections{margin:0;padding:0;border:0}
+.connection-panel .folder-connections .session-row{height:26px;margin:0;padding:0 6px 0 46px;gap:7px;border-radius:0;font-size:12.5px;cursor:default}
+.connection-panel .session-row .session-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:44px;flex:0 1 auto}
+.connection-panel .session-row .session-host{margin-left:auto;padding-left:8px;font-size:11px;color:var(--subtle);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:0 4 auto;font-variant-numeric:tabular-nums}
+.connection-panel .session-row .favorite-mark{color:var(--icon-star);flex-shrink:0}
+.connection-panel .session-row.selected{background:var(--accent-bg)}
+.connection-panel .session-row.selected .session-name{font-weight:600}
+.connection-panel .folder-connections .row-actions{display:none;margin-left:auto;gap:1px;flex-shrink:0}
+.connection-panel .folder-connections .session-row:is(:hover,:focus-within,.selected) .row-actions{display:flex}
+.connection-panel .folder-connections .session-row:is(:hover,:focus-within,.selected) .session-host{display:none}
+.connection-panel .folder-connections .row-actions>button,.connection-panel .folder-connections .row-actions>.move-connection{display:grid;place-items:center;width:22px;height:22px;padding:0;border-radius:4px;color:var(--muted);font-size:inherit}
+.connection-panel .folder-connections .row-actions>.delete-connection:hover{color:var(--danger-text);background:var(--danger-bg)}
+.connection-panel .empty-customer{padding:6px 10px 6px 46px;font-size:11.5px}
+.connection-panel .tree-folder.drop-target{border-radius:0}
+.connection-panel .tree-hint{margin:10px 10px 0;font-size:11px;line-height:1.5;color:var(--subtle)}
+.protocol-ssh,.protocol-local{color:var(--accent)}
+.protocol-local{color:var(--icon-local)}
+.protocol-rdp{color:var(--icon-blue)}
+.protocol-sftp,.protocol-ftp,.protocol-ftps{color:var(--icon-folder)}
+.protocol-vnc{color:var(--icon-violet)}
+.protocol-telnet,.protocol-serial{color:var(--muted)}
+.accent-icon{color:var(--accent)}
+.app-shell .sidebar-footer{padding:5px 8px}
+.app-shell .sidebar-footer button{font-size:11.5px}
+
+/* Ana alan */
+.session-notice{display:flex;align-items:center;gap:10px;height:28px;flex-shrink:0;padding:0 12px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted);background:var(--panel)}
+.session-notice.problem{background:var(--danger-bg);color:var(--danger-text)}
+.session-notice .notice-target{color:var(--text)}
+.session-notice .recording-badge{font-size:11px}
+.session-notice button.text-accent{padding:2px 0}
+
+/* Başlangıç */
+.main-content .home-page{padding:26px 30px 0;gap:0;background:var(--bg)}
+.home-grid{display:grid;grid-template-columns:minmax(260px,340px) minmax(0,1fr);gap:30px;align-items:start}
+.home-page h2{margin:0 0 10px;font-size:11.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.home-start-actions{display:grid;gap:8px}
+.home-action{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:7px;background:var(--raised);text-align:left}
+.home-action:hover:not(:disabled){border-color:var(--accent);background:var(--raised)}
+.home-action strong{display:block;font-size:13px;font-weight:600;color:var(--text)}
+.home-action small{display:block;margin-top:2px;font-size:11.5px;color:var(--muted)}
+.home-page .home-shortcuts{margin-top:14px;gap:6px 16px;font-size:11.5px;color:var(--muted)}
+.recent-table-wrap{border:1px solid var(--line);border-radius:7px;overflow:auto;background:var(--raised)}
+.recent-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.recent-table th{text-align:left;font-size:11.5px;font-weight:600;color:var(--muted);padding:7px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+.recent-table td{padding:5px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+.recent-table tr:last-child td{border-bottom:0}
+.recent-table tbody tr:hover td{background:var(--hover)}
+.recent-table td.dim{color:var(--muted);font-variant-numeric:tabular-nums}
+.recent-name{display:flex;align-items:center;gap:8px;padding:2px 0;font-weight:600;color:var(--text);text-align:left}
+.recent-name:hover:not(:disabled){background:none;color:var(--accent)}
+.home-empty{display:grid;gap:6px;padding:16px;border:1px dashed var(--line);border-radius:7px;color:var(--muted);line-height:1.5}
+.home-empty strong{color:var(--text)}
+.main-content .home-footnote{margin-top:auto;font-size:11px}
+@media (max-width:900px){.home-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* Uzak izleme */
+.app-shell .remote-monitor{height:29px;font-size:11.5px;color:var(--text);background:var(--toolbar);font-variant-numeric:tabular-nums}
+.app-shell .remote-monitor>span{gap:6px;padding:0 11px;height:100%}
+.app-shell .remote-monitor>span svg{color:var(--muted)}
+.app-shell .remote-monitor>.monitor-host{color:var(--text);font-weight:600;max-width:200px}
+.app-shell .remote-monitor>.monitor-host svg{color:var(--accent)}
+.usage-meter{display:inline-block;width:42px;height:6px;border-radius:3px;background:var(--line);overflow:hidden;flex-shrink:0}
+.usage-meter i{display:block;height:100%;background:var(--ok-text)}
+.usage-meter.warning i{background:var(--warn-text)}
+.usage-meter.critical i{background:var(--danger-text)}
+.app-shell .remote-monitor>.monitor-close{margin-left:auto;padding:4px 8px;color:var(--muted)}
+
+/* Durum satırı */
+.app-shell .statusbar{font-size:11px;background:var(--chrome);gap:8px}
+.app-shell .statusbar>button{font-size:11px}
+.app-shell .status-x{display:inline-flex;align-items:center;gap:5px;margin-left:0}

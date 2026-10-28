@@ -1,0 +1,15 @@
+import { useEffect, useState } from 'react';
+import { LockKeyhole, X } from 'lucide-react';
+import { api } from './api';
+export function VaultDialog({ locked, close, unlocked }: { locked: boolean; close: () => void; unlocked: () => void }) {
+  const [enabled, setEnabled] = useState(locked), [password, setPassword] = useState(''), [confirm, setConfirm] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('');
+  useEffect(() => { api.vaultStatus().then(s => setEnabled(s.enabled)).catch(e => setError(e.message)); }, []);
+  const run = async (fn: () => Promise<void>) => { setBusy(true); setError(''); try { await fn(); setPassword(''); setConfirm(''); } catch (e: any) { setError(e.message); } finally { setBusy(false); } };
+  return <div className={`modal-backdrop vault-backdrop ${locked ? 'locked' : ''}`}><section className="small-dialog" role="dialog" aria-modal="true" aria-label={locked ? 'VekoTerm kilitli' : 'Ana parola'}><header className="dialog-header"><h2><LockKeyhole size={20}/>{locked ? 'VekoTerm kilitli' : 'Ana parola'}</h2>{!locked && <button className="icon-button" title="Kapat" onClick={close}><X size={18}/></button>}</header><form onSubmit={e => { e.preventDefault(); void run(async () => { if (locked) { await api.unlockVault(password); unlocked(); } else { if (password !== confirm) throw new Error('Parolalar eşleşmiyor.'); await api.enableVault(password); setEnabled(true); } }); }}><div className="dialog-body">
+    <p className="field-hint">{locked ? 'Bağlantılarınıza erişmek için ana parolanızı girin.' : enabled ? 'Bağlantı kayıtları ana parolanızla şifreleniyor. Buradan parolanızı değiştirebilir veya uygulamayı kilitleyebilirsiniz.' : 'İsteğe bağlı ana parola, bağlantı kayıtlarınızı ve kaydedilmiş kimlik bilgilerinizi şifreler. Ana parola unutulursa bu kayıtlara erişim geri getirilemez.'}</p>
+    <label>{locked ? 'Ana parola' : enabled ? 'Yeni ana parola' : 'Ana parola'}<input autoFocus type="password" autoComplete={locked ? 'current-password' : 'new-password'} minLength={locked ? 1 : 8} value={password} onChange={e => setPassword(e.target.value)}/></label>
+    {!locked && <label>Yeni parolayı tekrar girin<input type="password" autoComplete="new-password" value={confirm} onChange={e => setConfirm(e.target.value)}/></label>}
+    {enabled && !locked && <><p className="field-hint">Kilitlemek VekoTerm içindeki bağlantıları kapatır. Ayrı RDP pencereleri açık kalır.</p><button type="button" className="button secondary" disabled={busy} onClick={() => run(async () => { await api.lockVault(); close(); })}><LockKeyhole size={15}/>Bağlantıları kapat ve kilitle</button></>}
+    {error && <div className="error-message" role="alert">{error}</div>}
+  </div><footer className="dialog-footer">{locked && <button type="button" className="button secondary" onClick={() => api.window('close')}>Uygulamayı kapat</button>}<button className="button primary" disabled={busy || !password || (!locked && (password.length < 8 || password !== confirm))}>{busy ? 'İşleniyor…' : locked ? 'Kilidi aç' : enabled ? 'Parolayı değiştir' : 'Ana parolayı etkinleştir'}</button></footer></form></section></div>;
+}

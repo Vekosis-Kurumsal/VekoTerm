@@ -1,0 +1,106 @@
+{
+  "name": "vekoterm",
+  "productName": "VekoTerm",
+  "version": "0.4.2",
+  "description": "Açık kaynak terminal ve uzak bağlantı çalışma alanı",
+  "author": "Vekosis Kurumsal Bilgi Sistemleri",
+  "license": "MIT",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "start": "electron .",
+    "check": "tsc --noEmit",
+    "package": "node scripts/licenses.cjs && vite build && electron-builder --win nsis --x64 --publish never",
+    "package:dir": "node scripts/licenses.cjs && vite build && electron-builder --win dir --x64 --publish never",
+    "prepare:x11": "node scripts/prepare-vcxsrv.cjs"
+  },
+  "dependencies": {
+    "@codemirror/commands": "6.11.0",
+    "@codemirror/lang-css": "6.3.1",
+    "@codemirror/lang-html": "6.4.12",
+    "@codemirror/lang-javascript": "6.2.5",
+    "@codemirror/lang-json": "6.0.2",
+    "@codemirror/lang-python": "6.2.1",
+    "@codemirror/lang-sql": "6.10.0",
+    "@codemirror/language": "6.12.4",
+    "@codemirror/legacy-modes": "6.5.4",
+    "@codemirror/search": "6.7.2",
+    "@codemirror/state": "6.7.4",
+    "@codemirror/view": "6.43.11",
+    "@novnc/novnc": "1.7.0",
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/addon-search": "0.16.0",
+    "@xterm/xterm": "6.0.0",
+    "basic-ftp": "6.2.1",
+    "codemirror": "6.0.2",
+    "diff": "9.0.0",
+    "lucide-react": "1.44.0",
+    "node-pty": "1.1.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "serialport": "13.0.0",
+    "ssh2": "1.17.0",
+    "ws": "8.21.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "electron": "44.3.0",
+    "electron-builder": "26.15.3",
+    "playwright": "^1.63.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.0"
+  },
+  "build": {
+    "appId": "com.vekosis.vekterm",
+    "productName": "VekoTerm",
+    "directories": {
+      "output": "release/0.4.2"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json",
+      "LICENSE",
+      "THIRD_PARTY_NOTICES.md",
+      "licenses/**/*"
+    ],
+    "asarUnpack": [
+      "node_modules/node-pty/**/*",
+      "node_modules/@serialport/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "vendor/vcxsrv",
+        "to": "vcxsrv"
+      }
+    ],
+    "npmRebuild": false,
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "assets/vekterm.ico",
+      "signExecutable": false
+    },
+    "nsis": {
+      "artifactName": "VekoTerm-Setup-${version}-${arch}.${ext}",
+      "oneClick": false,
+      "perMachine": false,
+      "selectPerMachineByDefault": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "VekoTerm",
+      "uninstallDisplayName": "VekoTerm",
+      "installerIcon": "assets/vekterm.ico",
+      "uninstallerIcon": "assets/vekterm.ico",
+      "installerLanguages": ["tr_TR", "en_US"],
+      "displayLanguageSelector": true,
+      "license": "LICENSE",
+      "deleteAppDataOnUninstall": false,
+      "differentialPackage": false,
+      "runAfterFinish": true
+    }
+  }
+}

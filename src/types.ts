@@ -1,0 +1,48 @@
+export type Profile = { id: string; name: string; type: 'ssh'|'sftp'|'local'|'rdp'|'vnc'|'telnet'|'serial'|'ftp'|'ftps'; host: string; port: number; username: string; folder: string; color: string; auth: string; keyPath: string; x11: boolean; shell: string; favorite: boolean; hasSecret?: boolean; password?: string; remember?: boolean; forgetSecret?: boolean; jumpProfileId?: string; compression?: boolean; agentForward?: boolean; keepaliveSeconds?: number; connectTimeout?: number; serial?: { path: string; baudRate: number; dataBits: number; stopBits: number; parity: string; rtscts: boolean; xonxoff: boolean; lineEnding: string; localEcho: boolean }; ftpImplicit?: boolean; rdp?: { displayMode?: 'fullscreen'|'window'|'custom'; scale?: 'auto'|number; resize?: 'dynamic'|'smart'; fullscreen: boolean; multimon: boolean; admin: boolean; clipboard: boolean; drives: boolean; printers: boolean; audio: string; width: number; height: number; gateway: string }; proxy?: { type: 'http'|'https'|'socks5'; host: string; port: number; username: string } };
+export type Session = { id: string; name: string; type: Profile['type']; host: string; username: string; color: string; profileId: string; status: string; buffer: string; home: string; vncURL?: string; logging?: boolean; recording?: boolean; rdpDisplay?: { scale: number; resize: 'dynamic'|'smart'; mode: string; width: number; height: number } };
+export type FileEntry = { name: string; path: string; directory: boolean; link?: boolean; size: number; modified: number; mode?: number };
+export type Listing = { path: string; parent: string; files: FileEntry[] };
+export type Transfer = { id: string; name: string; direction: string; bytes: number; status: string; detail?: string; total?: number; resumable?: boolean };
+export type AuthChallenge = { id: string; sessionId: string; title: string; instructions: string; prompts: { prompt: string; echo: boolean }[] };
+export type SavedWorkspace = { id: string; name: string; entries: Profile[]; layout: 'single'|'columns'|'rows'|'grid'; targets: number[]; active: number };
+export type Macro = { id: string; name: string; commands: string; delayMs: number };
+export type MacroRun = { id: string; name: string; status: string; message?: string };
+export type Tunnel = { id: string; name: string; profileId: string; kind: 'local'|'remote'|'dynamic'; listenPort: number; targetHost: string; targetPort: number; sessionId?: string; status?: string };
+export type AppEvent = { type: string; id?: string; data?: string; session?: Session; transfer?: Transfer; challenge?: AuthChallenge; macro?: MacroRun; message?: string };
+export type Preferences = { theme: string; fontSize: number; fontFamily?: string; copyOnSelect: boolean; compact?: boolean; terminalHighlights?: boolean };
+export type RemoteStats = { cpu: number|null; memoryUsed: number; memoryTotal: number; swapUsed: number; swapTotal: number; rx: number; tx: number; uptime: number; disks: { mount: string; percent: number; used: number; total: number }[] };
+export interface API {
+  bootstrap(): Promise<{ profiles: Profile[]; folders: string[]; preferences: Preferences; sessions: Session[]; version: string; desktop: boolean; locked?: boolean; portable?: boolean }>;
+  saveProfile(p: Partial<Profile>): Promise<Profile>; removeProfile(id: string): Promise<void>;
+  createFolder(name: string): Promise<string>; renameFolder(from: string, name: string): Promise<string>; removeFolder(name: string): Promise<void>; moveProfile(id: string, folder: string): Promise<Profile>;
+  open(p: Partial<Profile>): Promise<Session>; close(id: string): Promise<void>;
+  input(id: string, data: string): Promise<void>; resize(id: string, cols: number, rows: number): Promise<void>;
+  vncStatus(id: string, status: string): Promise<void>;
+  cancelTransfer(id: string): Promise<void>; resumeTransfer(id: string): Promise<void>;
+  monitor(id: string): Promise<RemoteStats>; currentDirectory(id: string): Promise<string>;
+  answerAuth(id: string, answers: string[]|null): Promise<void>;
+  compareFiles(): Promise<{ left: string; right: string; equal: boolean; leftHash: string; rightHash: string; note: string; changes: { value: string; kind: string }[] }|null>; compareFolders(): Promise<{ left: string; right: string; rows: { name: string; status: string }[] }|null>;
+  vaultStatus(): Promise<{ enabled: boolean; locked: boolean }>; enableVault(password: string): Promise<void>; disableVault(password: string): Promise<void>; lockVault(): Promise<void>; unlockVault(password: string): Promise<void>;
+  serialPorts(): Promise<{ path: string; manufacturer?: string }[]>;
+  networkTool(input: { kind: string; host: string; port: number }): Promise<string>; generateKey(input: { type: string; comment: string; passphrase: string }): Promise<{ path: string; fingerprint: string; publicKey: string }|null>; inspectKey(passphrase: string): Promise<{ path: string; fingerprint: string; publicKey: string }|null>;
+  workspaceList(): Promise<SavedWorkspace[]>; saveWorkspace(input: { id?: string; name: string; sessionIds: string[]; layout: string; targets: string[]; active: string }): Promise<SavedWorkspace>; removeWorkspace(id: string): Promise<void>; openWorkspace(id: string): Promise<{ sessions: Session[]; errors: string[]; layout: SavedWorkspace['layout']; targets: string[]; active: string }>;
+  duplicateSession(id: string): Promise<Session>; sendSavedPassword(id: string): Promise<boolean>; exportTerminal(id: string): Promise<boolean>; startLog(id: string): Promise<boolean>; stopLog(id: string): Promise<void>; clearTerminal(id: string): Promise<void>;
+  startRecording(id: string): Promise<void>; stopRecording(id: string): Promise<{ commands: string; skipped: number }>;
+  macroList(): Promise<Macro[]>; saveMacro(input: Macro): Promise<Macro>; removeMacro(id: string): Promise<void>; startMacro(id: string, targets: string[]): Promise<string>; stopMacro(id: string): Promise<void>;
+  list(id: string, dir: string): Promise<Listing>; read(id: string, file: string): Promise<{ path: string; text: string; hash: string }>;
+  write(id: string, path: string, text: string, hash: string): Promise<{ hash: string }>;
+  mkdir(id: string, dir: string, name: string): Promise<void>; rename(id: string, file: string, name: string): Promise<void>;
+  download(id: string, file: string, directory?: boolean): Promise<{ path: string; files?: number; skipped?: number }|null>; upload(id: string, dir: string): Promise<boolean>;
+  uploadFolder(id: string, dir: string): Promise<boolean>; uploadDropped(id: string, dir: string, files: File[]): Promise<boolean>;
+  downloadMany(id: string, files: FileEntry[]): Promise<boolean>;
+  createFile(id: string, dir: string, name: string): Promise<void>; permissions(id: string, file: string, mode: string): Promise<void>; removeFiles(id: string, dir: string, names: string[]): Promise<number>;
+  pickKey(): Promise<string>; preferences(p: Partial<Preferences>): Promise<Preferences>;
+  readClipboard(): Promise<string>; writeClipboard(text: string): Promise<void>;
+  tunnel(id: string, local: number, host: string, port: number): Promise<unknown>;
+  tunnelList(): Promise<{ saved: Tunnel[]; running: Tunnel[] }>; saveTunnel(input: Tunnel): Promise<Tunnel>; removeTunnel(id: string): Promise<void>; startTunnel(id: string, input: Tunnel): Promise<Tunnel>; stopTunnel(id: string): Promise<void>; startSavedTunnel(id: string): Promise<Tunnel>;
+  exportProfiles(options?: { encrypted: boolean; password?: string }): Promise<boolean>; importProfiles(options?: { encrypted: boolean; password?: string }): Promise<number|null>;
+  mobaxtermSources(): Promise<string[]>; importMobaXterm(): Promise<number|null>; xserver(options?: { clipboard: boolean; openGL: boolean }): Promise<{ display: number; running: boolean }>;
+  xserverStatus(): Promise<{ running: boolean; display: number|null; options: { clipboard: boolean; openGL: boolean } }>; stopXserver(): Promise<void>;
+  window(action: string): Promise<void>; onEvent(fn: (event: AppEvent) => void): () => void;
+}
+declare global { interface Window { vekterm?: API } }
