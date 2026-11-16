@@ -1,7 +1,7 @@
 import type { API } from './types';
 const unavailable = async (): Promise<any> => { throw new Error('Bağlantıları kullanmak için VekoTerm masaüstü uygulamasını açın.'); };
 export const api: API = window.vekterm || {
-  bootstrap: async () => ({ profiles: [], folders: ['Bağlantılar'], preferences: { theme: 'dark', fontSize: 14, copyOnSelect: true }, sessions: [], version: '0.4.2', desktop: false }),
+  bootstrap: async () => ({ profiles: [], folders: ['Bağlantılar'], preferences: { theme: 'dark', fontSize: 14, copyOnSelect: true }, sessions: [], version: '0.4.3', desktop: false }),
   saveProfile: unavailable, removeProfile: unavailable, open: unavailable, close: unavailable, input: unavailable, resize: unavailable,
   createFolder: unavailable, renameFolder: unavailable, removeFolder: unavailable, moveProfile: unavailable,
   list: unavailable, read: unavailable, write: unavailable, mkdir: unavailable, rename: unavailable, download: unavailable, upload: unavailable,

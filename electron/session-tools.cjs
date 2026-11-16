@@ -1,6 +1,30 @@
 const fs = require('node:fs');
-const { stripVTControlCharacters } = require('node:util');
 const { randomUUID } = require('node:crypto');
+// Removes terminal escape sequences as ECMA-48 defines them: CSI, OSC/DCS/APC/PM/SOS strings ending in BEL or ST,
+// and ESC + intermediates + one final byte (ESC 7, ESC 8, ESC ( B). util.stripVTControlCharacters also removed the
+// letter after ESC 7/ESC 8 ("root" became "oot") and stopped at the first space in a window title.
+function stripEscapes(text) {
+  text = String(text ?? ''); let out = '';
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]; let intro;
+    if (c === '\x1b') intro = text[++i];
+    else if ('\x90\x98\x9b\x9c\x9d\x9e\x9f'.includes(c)) intro = String.fromCharCode(c.charCodeAt(0) - 0x40);
+    else { out += c; continue; }
+    if (intro === undefined) break;
+    if (intro === '[') {
+      while (i + 1 < text.length && text[i + 1] >= ' ' && text[i + 1] <= '?') i++;
+      if (i + 1 < text.length && text[i + 1] >= '@' && text[i + 1] <= '~') i++;
+    } else if (']PX^_'.includes(intro)) {
+      while (++i < text.length && text[i] !== '\x07' && text[i] !== '\x9c' && !(text[i] === '\x1b' && text[i + 1] === '\\')) {}
+      if (text[i] === '\x1b') i++;
+    } else if (c === '\x1b') {
+      while (i < text.length && text[i] >= ' ' && text[i] <= '/') i++;
+      // Without a final byte the following character is ordinary output.
+      if (!(i < text.length && text[i] >= '0' && text[i] <= '~')) i--;
+    }
+  }
+  return out;
+}
 function recordedCommands(input) {
   const lines = []; let line = '', skipped = 0, unsupported = false;
   for (let i = 0; i < input.length; i++) {
@@ -35,7 +59,7 @@ class PlainLog {
 // The terminal's last line when it is a password question. OpenSSH/scp name the target ("erp@10.0.0.5's password:");
 // sudo names the user ("[sudo] password for erp:", "[sudo] erp için parola:") or nobody ("[sudo: authenticate] Password:").
 function passwordPrompt(buffer) {
-  const line = stripVTControlCharacters(String(buffer || '').slice(-2000)).replace(/\r\n/g, '\n').split('\n').pop().split('\r').pop();
+  const line = stripEscapes(String(buffer || '').slice(-2000)).replace(/\r\n/g, '\n').split('\n').pop().split('\r').pop();
   // The Windows console may redraw without line breaks, so only the end of the line is examined.
   const tail = line.slice(-200);
   const target = tail.match(/([^\s@'"/:\\]+)@([^\s@'"/:\\]+)'s password:\s*$/i);
@@ -80,7 +104,7 @@ const methods = {
     if (passwords.size > 1) throw new Error(`${target} için farklı parolalı birden çok kayıt var; hangisinin kullanılacağı belli değil. Parola gönderilmedi.`);
     return [...passwords][0];
   },
-  transcript(id) { return stripVTControlCharacters(this.get(id).buffer); },
+  transcript(id) { return stripEscapes(this.get(id).buffer); },
   startLog(id, filename) {
     const s = this.get(id); if (s.log) throw new Error('Bu oturumun kaydı zaten açık.');
     const log = new PlainLog(filename); try { log.write(s.buffer); } catch (error) { log.close(); throw error; }
@@ -114,4 +138,4 @@ const methods = {
   },
   stopMacro(id) { this.macroJobs?.get(id)?.abort(new Error('Makro durduruldu.')); }
 };
-module.exports = { methods, PlainLog, recordedCommands, passwordPrompt };
+module.exports = { methods, PlainLog, recordedCommands, passwordPrompt, stripEscapes };
