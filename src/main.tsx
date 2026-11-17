@@ -64,6 +64,8 @@ function App() {
   const current = sessions.find(s => s.id === active), connected = sessions.filter(s => s.status === 'connected');
   const terminalSessions = sessions.filter(s => ['ssh','local','sftp','telnet','serial','ftp','ftps'].includes(s.type));
   const notify = useCallback((text: string, error = false) => { setToast({ text, error }); if (toastTimer.current) clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(null), 6500); }, []);
+  // Saved passwords the Windows account can no longer open: said once per start; connecting asks for them.
+  const warnUnreadable = (list: Profile[]) => { const count = list.filter(p => p.secretUnreadable).length; if (count) notify(`${count} bağlantının kayıtlı parolası bu Windows hesabında açılamıyor. Bağlanırken parola sorulacak; yeniden saklamak için “Parolayı sakla”yı işaretleyin.`, true); };
   const run = async (fn: () => Promise<any>, success?: string) => { try { const result = await fn(); if (success && result !== false) notify(success); return result; } catch (e: any) { notify(e.message, true); } };
   const refreshProfiles = () => api.bootstrap().then(data => { setProfiles(data.profiles); setFolders(data.folders); });
   const revealFolder = (folder: string) => setTreeState(previous => ({ query: '', favorites: false, collapsed: previous.collapsed.filter(f => f !== folder) }));
@@ -80,7 +82,7 @@ function App() {
   const askRemoveProfile = (profile: Profile) => { setPromptError(''); setPrompt({ title: 'Bağlantıyı sil', label: `“${profile.name}” (${profile.folder}) bağlantısı ve kayıtlı parolası silinecek. Açık sekmesi varsa kapanmaz. Bu işlem geri alınamaz.`, value: '', danger: true, confirmLabel: 'Sil', action: async () => { await api.removeProfile(profile.id); await refreshProfiles(); setSelectedProfile(previous => previous === profile.id ? '' : previous); setNewSession(previous => previous?.id === profile.id ? null : previous); notify(`“${profile.name}” silindi.`); } }); };
   const moveProfile = async (profile: Profile, folder: string) => { await api.moveProfile(profile.id, folder); await refreshProfiles(); revealFolder(folder); setSelectedProfile(profile.id); notify(`Bağlantı “${folder}” klasörüne taşındı.`); };
   useEffect(() => {
-    api.bootstrap().then(data => { setProfiles(data.profiles); setFolders(data.folders); setPreferences(data.preferences); sessionList.current = data.sessions; setSessions(data.sessions); setDesktop(data.desktop); setVersion(data.version); setLocked(!!data.locked); }).catch(e => notify(e.message, true));
+    api.bootstrap().then(data => { setProfiles(data.profiles); setFolders(data.folders); setPreferences(data.preferences); sessionList.current = data.sessions; setSessions(data.sessions); setDesktop(data.desktop); setVersion(data.version); setLocked(!!data.locked); warnUnreadable(data.profiles); }).catch(e => notify(e.message, true));
     const unsub = api.onEvent(e => {
       if (e.type === 'locked') { setLocked(true); setImportExport(null); setProfiles([]); setFolders([]); setEditor(null); setMacros(null); setAuthChallenges([]); setNewSession(null); setTransfers([]); setToast(null); setWorkspaces(false); setUtilities(false); }
       if (e.type === 'state' && e.session) {
@@ -127,7 +129,7 @@ function App() {
     document.addEventListener('keydown', cycle, true); return () => document.removeEventListener('keydown', cycle, true);
   }, [locked]);
   const openLocal = () => run(() => api.open({ ...blankProfile('local'), name: 'PowerShell' }));
-  const connect = async (p: Profile) => { if (['ssh','sftp','ftp','ftps'].includes(p.type) && !['agent', 'interactive'].includes(p.auth) && !p.hasSecret && !p.password && p.auth !== 'key') { setNewSession(p); return; } const session = await run(() => api.open(p)); if (session && profiles.some(saved => saved.id === p.id)) remember(p.id); };
+  const connect = async (p: Profile) => { if (['ssh','sftp','ftp','ftps'].includes(p.type) && !['agent', 'interactive'].includes(p.auth) && !p.hasSecret && !p.password && p.auth !== 'key') { setNewSession(p.secretUnreadable ? { ...p, remember: true } : p); return; } const session = await run(() => api.open(p)); if (session && profiles.some(saved => saved.id === p.id)) remember(p.id); };
   const saveSession = async (p: Profile, connectNow: boolean) => { const saved = await api.saveProfile(p); await refreshProfiles(); revealFolder(saved.folder); if (connectNow) { setNewSession(null); await api.open({ ...saved, password: p.password }); remember(saved.id); } else notify('Oturum kaydedildi.'); };
   // Quick connect: a saved connection's name opens it; otherwise user@host[:port] opens SSH and the password is asked by the connection.
   const runQuickConnect = () => {
@@ -214,7 +216,7 @@ function App() {
   const visiblePanes = current && terminalSessions.some(s => s.id === active) ? maxPanes === 1 ? [active] : chosenPanes.includes(active) ? chosenPanes : [active, ...chosenPanes].slice(0, maxPanes) : [];
   const reorderTab = (target: string) => { const source = draggedTab.current; draggedTab.current = ''; if (!source || source === target) return; const next = [...sessionList.current], from = next.findIndex(s => s.id === source); if (from < 0) return; const [item] = next.splice(from, 1), to = next.findIndex(s => s.id === target); if (to < 0) return; next.splice(to, 0, item); sessionList.current = next; setSessions(next); };
 
-  if (locked) return <VaultDialog locked close={() => {}} unlocked={() => { void api.bootstrap().then(data => { setProfiles(data.profiles); setFolders(data.folders); setPreferences(data.preferences); sessionList.current = data.sessions; setSessions(data.sessions); setActive('home'); setLocked(false); }).catch(e => notify(e.message, true)); }}/>
+  if (locked) return <VaultDialog locked close={() => {}} unlocked={() => { void api.bootstrap().then(data => { setProfiles(data.profiles); setFolders(data.folders); setPreferences(data.preferences); sessionList.current = data.sessions; setSessions(data.sessions); setActive('home'); setLocked(false); warnUnreadable(data.profiles); }).catch(e => notify(e.message, true)); }}/>
   const railWidth = 38, problem = !!current && ['error', 'closed'].includes(current.status);
   return <div className="app-shell">
     <header className="titlebar"><div className="brand"><span className="brand-mark"><Terminal size={15}/></span><strong>Veko<span>Term</span></strong></div><div className="title-context">{current ? `${sessions.indexOf(current) + 1}. ${current.name}` : 'Başlangıç'}</div><div className="window-controls"><button aria-label="Simge durumuna küçült" onClick={() => api.window('minimize')}><Minus size={15}/></button><button aria-label="Büyüt" onClick={() => api.window('maximize')}><Maximize2 size={13}/></button><button aria-label="Uygulamayı kapat" onClick={() => api.window('close')}><X size={17}/></button></div></header>

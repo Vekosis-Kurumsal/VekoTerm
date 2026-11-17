@@ -85,6 +85,7 @@ const methods = {
       if (local) throw new Error(`Parola sorusunun hangi sunucuya ait olduğu anlaşılmıyor. Yerel terminalde yalnız “kullanıcı@sunucu's password:” sorularına parola gönderilir.`);
       if (s.profile.auth !== 'password') throw new Error('Bu bağlantı parolayla açılmadı; gönderilecek sunucu parolası yok.');
       if (prompt.user && s.profile.username && prompt.user !== s.profile.username) throw new Error(`Sunucu ${prompt.user} kullanıcısının parolasını soruyor; bu bağlantının parolası ${s.profile.username} için. Parola gönderilmedi.`);
+      if (!s.authInput?.password && !this.store?.locked && this.store?.secretUnreadable?.(s.profile.id)) throw new Error('Bu bağlantının kayıtlı parolası bu Windows hesabında açılamıyor; Windows hesap parolası başka bir yerden değiştirilmiş ya da sıfırlanmış olabilir. Bağlantıyı düzenleyip parolayı yeniden yazın ve “Parolayı sakla”yı işaretleyin. Parola gönderilmedi.');
       password = s.authInput?.password || (this.store?.locked ? '' : this.store?.secret?.(s.profile.id)) || '';
       if (!password) throw new Error('Bu bağlantı için parola yok. Bağlantı ayarlarında “Parolayı sakla” seçeneğini işaretleyebilir veya bağlanırken yazabilirsiniz.');
     }
@@ -96,10 +97,13 @@ const methods = {
     if (this.store?.locked) throw new Error('Uygulama kilitli. Kayıtlı parolalar için önce kilidi açın.');
     const target = `${user}@${host}`, same = p => ['ssh', 'sftp'].includes(p.type) && p.auth === 'password' && p.username === user && String(p.host).toLowerCase() === host.toLowerCase();
     const profiles = (this.store?.list?.() || []).filter(same);
-    const passwords = new Set(profiles.map(p => this.store.secret(p.id)).filter(Boolean));
+    // Saved passwords Windows can no longer open are skipped and named in the answer.
+    const unreadable = profiles.filter(p => p.secretUnreadable);
+    const passwords = new Set(profiles.filter(p => !p.secretUnreadable).map(p => this.store.secret(p.id)).filter(Boolean));
     // An SSH tab connected to the same user@host also knows the password typed at login.
     if (s.profile.type === 'ssh' && same(s.profile) && s.authInput?.password) passwords.add(s.authInput.password);
     if (!profiles.length && !passwords.size) throw new Error(`Kayıtlı bağlantılarda ${target} yok. Bu kullanıcı ve adresle bir bağlantı kaydedip parolasını saklayın. Parola gönderilmedi.`);
+    if (!passwords.size && unreadable.length) throw new Error(`${target} kaydının parolası bu Windows hesabında açılamıyor; Windows hesap parolası başka bir yerden değiştirilmiş ya da sıfırlanmış olabilir. Bağlantıyı düzenleyip parolayı yeniden yazın ve “Parolayı sakla”yı işaretleyin. Parola gönderilmedi.`);
     if (!passwords.size) throw new Error(`${target} kayıtlı ama parolası saklanmamış. Bağlantı ayarlarında “Parolayı sakla” seçeneğini işaretleyin. Parola gönderilmedi.`);
     if (passwords.size > 1) throw new Error(`${target} için farklı parolalı birden çok kayıt var; hangisinin kullanılacağı belli değil. Parola gönderilmedi.`);
     return [...passwords][0];

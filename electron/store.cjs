@@ -87,7 +87,7 @@ class Store {
     const verified = require('./vault.cjs').unseal(JSON.parse(fs.readFileSync(this.file, 'utf8')), password); verified.key.fill(0);
     const previous = this.vault; this.vault = null; try { this.flush(); previous.key.fill(0); } catch (error) { this.vault = previous; throw error; }
   }
-  list() { return this.data.profiles.map(p => ({ ...p, hasSecret: !!this.data.secrets[p.id] })); }
+  list() { return this.data.profiles.map(p => ({ ...p, ...this.secretState(p.id) })); }
   folders() { return [...this.data.folders].sort((a, b) => a === b ? 0 : a === DEFAULT_FOLDER ? -1 : b === DEFAULT_FOLDER ? 1 : a.localeCompare(b, 'tr')); }
   folderName(value) {
     const name = cleanFolder(value);
@@ -115,7 +115,7 @@ class Store {
     const profile = this.data.profiles.find(p => p.id === id);
     if (!profile) throw new Error('Bağlantı bulunamadı.');
     if (!this.data.folders.includes(folder)) throw new Error('Hedef bağlantı klasörü bulunamadı.');
-    profile.folder = folder; this.flush(); return { ...profile, hasSecret: !!this.data.secrets[id] };
+    profile.folder = folder; this.flush(); return { ...profile, ...this.secretState(id) };
   }
   save(input) {
     const profile = cleanProfile(input);
@@ -130,7 +130,7 @@ class Store {
     if (index < 0) this.data.profiles.push(profile); else this.data.profiles[index] = profile;
     if (sealed) this.data.secrets[profile.id] = sealed;
     if (input.forgetSecret) delete this.data.secrets[profile.id];
-    this.flush(); return { ...profile, hasSecret: !!this.data.secrets[profile.id] };
+    this.flush(); return { ...profile, ...this.secretState(profile.id) };
   }
   importProfiles(input) {
     if (this.locked) throw new Error('Önce uygulamanın kilidini açın.');
@@ -158,7 +158,30 @@ class Store {
     try { this.flush(); } catch (error) { this.data = previous; throw error; }
     return input.profiles.length;
   }
-  secret(id) { const value = this.data.secrets[id]; return value ? this.secure.decryptString(Buffer.from(value, 'base64')) : ''; }
+  // A saved password the current Windows protection key cannot open (the Windows account password was reset, or
+  // changed somewhere other than this computer) counts as not saved: connecting asks for it and it can be saved again.
+  // The unreadable value is kept, so it opens again if the old key comes back.
+  secretState(id) {
+    if (!this.data.secrets[id]) return { hasSecret: false };
+    return this.secretUnreadable(id) ? { hasSecret: false, secretUnreadable: true } : { hasSecret: true };
+  }
+  secretUnreadable(id) {
+    const value = this.data.secrets[id]; if (!value) return false;
+    this.readable ||= new Map();
+    if (!this.readable.has(value)) {
+      let ok = true; try { this.secure.decryptString(Buffer.from(value, 'base64')); } catch { ok = false; }
+      this.readable.set(value, ok);
+    }
+    return !this.readable.get(value);
+  }
+  unreadableSecretError(id) {
+    const name = this.data.profiles.find(p => p.id === id)?.name;
+    return Object.assign(new Error(`${name ? `“${name}” bağlantısının` : 'Bu bağlantının'} kayıtlı parolası bu Windows hesabında açılamıyor; Windows hesap parolası başka bir yerden değiştirilmiş ya da sıfırlanmış olabilir. Bağlantıyı düzenleyip parolayı yeniden yazın ve “Parolayı sakla”yı işaretleyin.`), { code: 'SECRET_UNREADABLE' });
+  }
+  secret(id) {
+    const value = this.data.secrets[id]; if (!value) return '';
+    try { return this.secure.decryptString(Buffer.from(value, 'base64')); } catch { throw this.unreadableSecretError(id); }
+  }
   remove(id) {
     if (this.locked) throw new Error('Önce uygulamanın kilidini açın.');
     if (!this.data.profiles.some(p => p.id === id)) throw new Error('Bağlantı bulunamadı.');

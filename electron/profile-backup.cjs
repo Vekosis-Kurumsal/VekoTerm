@@ -28,11 +28,13 @@ async function exportConnections(store, options = {}) {
   try {
     unlocked(store);
     data.passwords = {};
+    const unreadable = [];
     for (const profile of data.profiles) {
       if (!store.data.secrets[profile.id]) continue;
       try { data.passwords[profile.id] = store.secret(profile.id); }
-      catch { throw new Error(`“${profile.name}” bağlantısının kayıtlı parolası bu Windows hesabında okunamadı. Yedek oluşturulmadı.`); }
+      catch { unreadable.push(`“${profile.name}”`); }
     }
+    if (unreadable.length) throw new Error(`Şu bağlantıların kayıtlı parolası bu Windows hesabında açılamıyor: ${unreadable.join(', ')}. Yedek oluşturulmadı. Bu bağlantıları düzenleyip parolayı yeniden kaydedin ya da “Bu oturumun kayıtlı parolasını sil” ile temizleyin.`);
     clear = Buffer.from(JSON.stringify(data));
     if (clear.length > MAX_PAYLOAD) throw new Error('Bağlantı yedeği çok büyük.');
     const iv = randomBytes(12), cipher = createCipheriv('aes-256-gcm', key, iv);

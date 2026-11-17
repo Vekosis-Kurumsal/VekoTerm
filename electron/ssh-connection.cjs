@@ -25,8 +25,11 @@ module.exports = async function connectSSH(s, profile, input = {}, chain = []) {
     }
     socket = await require('./proxy.cjs').connectProxy(profile.proxy, profile.host, profile.port, secret, (profile.connectTimeout || 25) * 1000); s.resources.push(socket);
   }
-  let password = input.password || this.store.secret(profile.id);
-  if (!password && profile.auth === 'password' && this.options.promptAuth) { const answers = await this.options.promptAuth(s.id, `${profile.name} · Bağlantı parolası`, [{ prompt: 'Parola', echo: false }]); password = answers[0]; if (s.authInput && profile.id === s.profile.id) s.authInput.password = password; }
+  // A saved password Windows can no longer open is asked for instead (a key passphrase is asked for by the key check).
+  const unreadable = !input.password && !!this.store.secretUnreadable?.(profile.id);
+  if (unreadable && profile.auth === 'password' && !this.options.promptAuth) throw this.store.unreadableSecretError(profile.id);
+  let password = input.password || (unreadable ? '' : this.store.secret(profile.id));
+  if (!password && profile.auth === 'password' && this.options.promptAuth) { const answers = await this.options.promptAuth(s.id, `${profile.name} · ${unreadable ? 'Kayıtlı parola açılamadı, parolayı yazın' : 'Bağlantı parolası'}`, [{ prompt: 'Parola', echo: false }]); password = answers[0]; if (s.authInput && profile.id === s.profile.id) s.authInput.password = password; }
   const cfg = {
     host: profile.host, port: profile.port, username: profile.username, sock: socket,
     readyTimeout: (profile.connectTimeout || 25) * 1000,

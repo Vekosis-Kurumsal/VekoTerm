@@ -51,8 +51,10 @@ class FtpAdapter {
   close() { this.closed = true; for (const c of this.clients) c.close(); this.clients.clear(); this.config = null; }
 }
 async function openFTP(s, input) {
-  let password = input.password || this.store.secret(s.profile.id);
-  if (!password && s.profile.username && s.profile.username !== 'anonymous' && this.options.promptAuth) password = (await this.options.promptAuth(s.id, `${s.profile.name} · FTP`, [{ prompt: 'Parola', echo: false }]))[0];
+  const unreadable = !input.password && !!this.store.secretUnreadable?.(s.profile.id);
+  if (unreadable && !this.options.promptAuth) throw this.store.unreadableSecretError(s.profile.id);
+  let password = input.password || (unreadable ? '' : this.store.secret(s.profile.id));
+  if (!password && s.profile.username && s.profile.username !== 'anonymous' && this.options.promptAuth) password = (await this.options.promptAuth(s.id, `${s.profile.name} · ${unreadable ? 'Kayıtlı parola açılamadı, parolayı yazın' : 'FTP'}`, [{ prompt: 'Parola', echo: false }]))[0];
   const ftp = new FtpAdapter({ host: s.profile.host, port: s.profile.port, user: s.profile.username || 'anonymous', password: password || 'guest', secure: s.profile.type === 'ftps' ? (s.profile.ftpImplicit ? 'implicit' : true) : false });
   s.resources.push(ftp); s.sftp = ftp; s.home = await ftp.access();
   this.output(s, `\r\n${s.profile.type.toUpperCase()} bağlantısı hazır. Dosyaları soldaki panelden yönetebilirsiniz.\r\n`);
