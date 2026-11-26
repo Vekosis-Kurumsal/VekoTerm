@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, safeStorage, Menu, clipboard, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, safeStorage, Menu, Tray, clipboard, screen, shell, net: electronNet } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const { spawn, execFile } = require('node:child_process');
@@ -7,12 +7,54 @@ const net = require('node:net');
 const { WebSocketServer } = require('ws');
 const { Store, cleanProfile } = require('./store.cjs');
 const { Sessions, safeName } = require('./sessions.cjs');
+const { Updates } = require('./updates.cjs');
 const { XServer } = require('./xserver.cjs');
 app.setName('VekoTerm');
 // Keep the existing profile location after the product rename.
 const portable = app.commandLine.hasSwitch('portable');
 app.setPath('userData', process.env.VEKTERM_TEST_HOME || (portable ? path.join(path.dirname(app.getPath('exe')), 'VekoTerm-data') : path.join(app.getPath('appData'), 'VekTerm')));
-let window, sessions, store, xserver;
+// Automated tests can run without showing a window on the user's screen; rendering must not be throttled there.
+const hiddenTestWindow = !!process.env.VEKTERM_TEST_HOME && process.env.VEKTERM_TEST_HIDDEN === '1';
+if (hiddenTestWindow) {
+  app.commandLine.appendSwitch('disable-renderer-backgrounding');
+  app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+  app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+}
+let window, sessions, store, xserver, updates, tray = null, quitting = false, trayHintShown = false;
+// One VekoTerm per data folder: starting it again brings the open window forward instead of a second copy
+// writing the same settings file.
+const firstInstance = app.requestSingleInstanceLock();
+if (!firstInstance) app.quit();
+app.on('second-instance', () => showWindow());
+// A quit requested for the whole app (Windows sign-out, tray "Çık" after its own question, automation) must not
+// wait on the per-window question; closing the window itself still asks.
+app.on('before-quit', () => { quitting = true; });
+app.on('will-quit', () => { store?.flushPending(); sessions?.closeAll(); xserver?.stop(); tray?.destroy(); tray = null; });
+function showWindow() {
+  if (!window || window.isDestroyed()) return;
+  if (window.isMinimized()) window.restore();
+  if (hiddenTestWindow) window.showInactive(); else { window.show(); window.focus(); }
+}
+function confirmQuit() {
+  if (![...(sessions?.items.values() || [])].some(s => s.status === 'connected')) return true;
+  const answer = dialog.showMessageBoxSync(window, { type: 'question', title: 'VekoTerm’i kapat', message: 'Açık bağlantılar sonlandırılacak.', buttons: ['Vazgeç', 'Bağlantıları kapat ve çık'], defaultId: 0, cancelId: 0 });
+  return answer === 1;
+}
+function quitApp() {
+  if (quitting) return;
+  if (!confirmQuit()) return;
+  quitting = true; sessions?.closeAll(); xserver?.stop(); tray?.destroy(); tray = null; app.quit();
+}
+function hideToTray() {
+  if (!tray) {
+    tray = new Tray(path.join(__dirname, '../assets/vekterm.ico'));
+    tray.setToolTip('VekoTerm');
+    tray.setContextMenu(Menu.buildFromTemplate([{ label: 'VekoTerm’i göster', click: showWindow }, { type: 'separator' }, { label: 'Çık', click: quitApp }]));
+    tray.on('click', showWindow); tray.on('double-click', showWindow);
+  }
+  window.hide();
+  if (!trayHintShown && !hiddenTestWindow) { trayHintShown = true; tray.displayBalloon({ title: 'VekoTerm tepside çalışıyor', content: 'Bağlantılarınız açık kalır. Geri açmak için tepsideki VekoTerm simgesine tıklayın.' }); }
+}
 const authQuestions = new Map();
 function promptAuth(sessionId, title, prompts, instructions = '') {
   if (store?.locked) return Promise.reject(new Error('Uygulama kilitli.'));
@@ -88,7 +130,11 @@ async function openRDP(s) {
 }
 
 app.whenReady().then(async () => {
+  if (!firstInstance) return;
   store = new Store(app.getPath('userData'), safeStorage);
+  // Updates come from GitHub; tests may point the check at a local server, but only inside a test home.
+  const testUpdateApi = process.env.VEKTERM_TEST_HOME && process.env.VEKTERM_TEST_UPDATE_API;
+  updates = new Updates({ version: app.getVersion(), directory: path.join(app.getPath('temp'), 'VekoTerm-guncelleme'), fetch: (url, options) => electronNet.fetch(url, options), ...(testUpdateApi ? { api: testUpdateApi } : {}) });
   xserver = new XServer(app.getPath('userData'), app.isPackaged ? path.join(process.resourcesPath, 'vcxsrv') : path.join(__dirname, '../vendor/vcxsrv'));
   sessions = new Sessions(store, {
     localCwd: process.env.VEKTERM_TEST_HOME || undefined,
@@ -108,7 +154,7 @@ app.whenReady().then(async () => {
   handle('saveProfile', p => store.save(p)); handle('removeProfile', id => store.remove(id));
   for (const name of ['createFolder', 'renameFolder', 'removeFolder', 'moveProfile']) handle(name, (...args) => store[name](...args));
   handle('open', p => sessions.open(p)); handle('close', id => sessions.close(id));
-  handle('input', (id, data) => sessions.input(id, data)); handle('resize', (id, cols, rows) => sessions.resize(id, cols, rows));
+  handle('input', (id, data) => sessions.userInput(id, data)); handle('resize', (id, cols, rows) => sessions.resize(id, cols, rows));
   handle('cancelTransfer', id => sessions.cancelTransfer(id)); handle('resumeTransfer', id => sessions.resumeTransfer(id));
   handle('monitor', id => sessions.monitor(id)); handle('currentDirectory', id => sessions.currentDirectory(id));
   handle('answerAuth', (id, answers) => {
@@ -120,12 +166,37 @@ app.whenReady().then(async () => {
   handle('saveTunnel', input => store.saveTunnel(input)); handle('removeTunnel', id => store.removeTunnel(id));
   handle('startTunnel', (id, input) => sessions.startTunnel(id, input)); handle('stopTunnel', id => sessions.stopTunnel(id)); handle('startSavedTunnel', id => sessions.startSavedTunnel(id));
   handle('duplicateSession', id => sessions.duplicateSession(id));
+  // Server operations: only these names can be called from the window.
+  const opsActions = { services: 'opsServices', serviceLog: 'opsServiceLog', serviceAction: 'opsServiceAction', processes: 'opsProcesses', kill: 'opsKill', docker: 'opsDocker', dockerAction: 'opsDockerAction', dockerLogs: 'opsDockerLogs' };
+  handle('updateCheck', async () => { const result = await updates.check(); if (!store.locked) { store.data.lastUpdateCheck = Date.now(); store.flushSoon(); } return { ...result, portable }; });
+  handle('updateDownload', () => updates.download(progress => { if (!window.isDestroyed()) window.webContents.send('vekterm:event', { type: 'updateProgress', progress }); }));
+  handle('updateCancel', () => updates.cancel());
+  handle('updatePage', async () => { const page = updates.releasePage(); if (page) await shell.openExternal(page); });
+  // Starts the verified installer and closes VekoTerm so the installer can replace it.
+  handle('updateInstall', async () => {
+    if (portable) throw new Error('Taşınabilir kullanımda VekoTerm kendini kurmaz. Yeni sürümü sürüm sayfasından indirin.');
+    const file = await updates.verifiedInstaller();
+    if (!confirmQuit()) return false;
+    const failure = await shell.openPath(file); if (failure) throw new Error(`Kurulum başlatılamadı: ${failure}`);
+    quitting = true; sessions?.closeAll(); xserver?.stop(); tray?.destroy(); tray = null; setTimeout(() => app.quit(), 300); return true;
+  });
+  // Folder sync. The folder on this computer comes from a system dialog or is the pair saved for this connection.
+  const syncFolders = new Set();
+  const syncKey = id => { const p = sessions.get(id).profile; return p.id || `${p.username || ''}@${p.host}:${p.port || 22}`; };
+  const allowedSyncFolder = (id, local) => { if (typeof local !== 'string' || !(syncFolders.has(local) || store.syncPair(syncKey(id))?.local === local)) throw new Error('Bilgisayardaki klasörü yeniden seçin.'); };
+  handle('syncPickLocal', async () => { const result = await dialog.showOpenDialog(window, { title: 'Bilgisayardaki klasörü seç', properties: ['openDirectory', 'createDirectory'] }); if (result.canceled || !result.filePaths[0]) return ''; const folder = await fs.realpath(result.filePaths[0]); syncFolders.add(folder); return folder; });
+  handle('syncPair', id => store.syncPair(syncKey(id)));
+  handle('syncCompare', async (id, local, remote, exclude) => { allowedSyncFolder(id, local); const result = await sessions.syncCompare(id, local, remote, exclude); syncFolders.add(result.local); store.saveSyncPair(syncKey(id), { local: result.local, remote: result.remote, exclude }); return result; });
+  handle('syncRun', (id, local, remote, items) => { allowedSyncFolder(id, local); return sessions.syncRun(id, local, remote, items); });
+  handle('ops', (id, action, ...args) => { if (!Object.hasOwn(opsActions, action)) throw new Error('Geçersiz sunucu işlemi.'); return sessions[opsActions[action]](id, ...args); });
+  handle('historyList', () => store.history()); handle('historyRemove', id => store.removeHistory(id)); handle('historyClear', () => store.clearHistory());
+  handle('reconnect', id => sessions.reconnect(id)); handle('cancelReconnect', id => sessions.cancelReconnect(id));
   handle('sendSavedPassword', id => sessions.sendSavedPassword(id));
   handle('exportTerminal', async id => { const result = await dialog.showSaveDialog(window, { title: 'Terminal çıktısını kaydet', defaultPath: 'VekoTerm-terminal.txt' }); if (result.canceled) return false; await fs.writeFile(result.filePath, sessions.transcript(id), 'utf8'); return true; });
   handle('startLog', async id => { const result = await dialog.showSaveDialog(window, { title: 'Terminal kaydının konumu', defaultPath: 'VekoTerm-oturum.log' }); if (result.canceled) return false; sessions.startLog(id, result.filePath); return true; });
   handle('stopLog', id => sessions.stopLog(id));
   handle('startRecording', id => sessions.startRecording(id)); handle('stopRecording', id => sessions.stopRecording(id));
-  handle('macroList', () => store.data.macros || []); handle('saveMacro', input => store.saveMacro(input)); handle('removeMacro', id => store.removeMacro(id)); handle('startMacro', (id, targets) => sessions.startMacro(id, targets)); handle('stopMacro', id => sessions.stopMacro(id));
+  handle('macroList', () => store.data.macros || []); handle('saveMacro', input => store.saveMacro(input)); handle('removeMacro', id => store.removeMacro(id)); handle('startMacro', (id, targets, values) => sessions.startMacro(id, targets, values)); handle('macroVariables', () => store.locked ? {} : (store.data.macroVariables || {})); handle('stopMacro', id => sessions.stopMacro(id));
   handle('clearTerminal', id => { const s = sessions.get(id); s.buffer = ''; sessions.output(s, '\x1b[2J\x1b[3J\x1b[H'); });
   handle('vncStatus', (id, status) => { const s = sessions.get(id); if (s.profile.type !== 'vnc' || !['connected','closed','error'].includes(status)) throw new Error('Geçersiz oturum durumu.'); s.status = status; sessions.emitState(s); });
   for (const name of ['list', 'read', 'write', 'mkdir', 'rename', 'tunnel', 'createFile', 'permissions', 'removeFiles']) handle(name, (...args) => sessions[name](...args));
@@ -260,17 +331,36 @@ app.whenReady().then(async () => {
   handle('xserver', async options => { if (options) { store.data.xserverOptions = { clipboard: options.clipboard !== false, openGL: options.openGL !== false }; store.flush(); } const cfg = await xserver.start(store.data.xserverOptions); return { running: true, display: cfg.display }; });
   handle('xserverStatus', () => ({ running: !!xserver.config, display: xserver.config?.display ?? null, options: store.data.xserverOptions || { clipboard: true, openGL: true } }));
   handle('stopXserver', () => xserver.stop());
-  handle('window', action => { if (action === 'minimize') window.minimize(); else if (action === 'maximize') window.isMaximized() ? window.unmaximize() : window.maximize(); else if (action === 'close') window.close(); });
-  let quitting = false;
+  handle('window', action => { if (action === 'minimize') window.minimize(); else if (action === 'maximize') window.isMaximized() ? window.unmaximize() : window.maximize(); else if (action === 'close') window.close(); else if (action === 'quit') quitApp(); });
+  // Closing the window follows the "when the window is closed" setting: quit, keep running in the tray, or ask.
   window.on('close', event => {
     if (quitting) return;
-    if ([...sessions.items.values()].some(s => s.status === 'connected')) {
-      const answer = dialog.showMessageBoxSync(window, { type: 'question', title: 'VekoTerm’i kapat', message: 'Açık bağlantılar sonlandırılacak.', buttons: ['Vazgeç', 'Bağlantıları kapat ve çık'], defaultId: 0, cancelId: 0 });
-      if (answer !== 1) { event.preventDefault(); return; }
+    const action = store.data.preferences.closeAction || 'quit';
+    if (action === 'tray') { event.preventDefault(); hideToTray(); return; }
+    if (action === 'ask') {
+      event.preventDefault();
+      void dialog.showMessageBox(window, { type: 'question', title: 'VekoTerm’i kapat', message: 'VekoTerm kapatılsın mı, yoksa sistem tepsisinde çalışmaya devam etsin mi?', detail: 'Tepside çalışırken bağlantılarınız açık kalır.', buttons: ['Vazgeç', 'Tepsiye küçült', 'Çık'], defaultId: 1, cancelId: 0, noLink: true, checkboxLabel: 'Seçimimi hatırla, bir daha sorma' }).then(({ response, checkboxChecked }) => {
+        if (response === 0) return;
+        if (checkboxChecked) { store.preferences({ ...store.data.preferences, closeAction: response === 1 ? 'tray' : 'quit' }); window.webContents.send('vekterm:event', { type: 'preferences', preferences: store.data.preferences }); }
+        if (response === 1) hideToTray(); else quitApp();
+      });
+      return;
     }
-    quitting = true; sessions.closeAll(); xserver.stop();
+    if (!confirmQuit()) { event.preventDefault(); return; }
+    quitting = true; sessions.closeAll(); xserver.stop(); tray?.destroy(); tray = null;
   });
-  window.once('ready-to-show', () => window.show());
+  window.once('ready-to-show', () => {
+    if (!hiddenTestWindow) { window.show(); return; }
+    window.setSkipTaskbar(true); window.setPosition(-32000, -32000); window.showInactive(); window.setIgnoreMouseEvents(true);
+  });
   if (devURL) await window.loadURL(devURL); else await window.loadFile(path.join(__dirname, '../dist/index.html'));
+  // At most one automatic check a day, a few seconds after start; it can be turned off in the settings.
+  if (!process.env.VEKTERM_TEST_HOME || testUpdateApi) setTimeout(async () => {
+    if (store.locked || store.data.preferences.updateCheck === false || Date.now() - (store.data.lastUpdateCheck || 0) < 20 * 3600 * 1000) return;
+    try {
+      const result = await updates.check(); store.data.lastUpdateCheck = Date.now(); store.flushSoon();
+      if (result.available && !window.isDestroyed()) window.webContents.send('vekterm:event', { type: 'update', update: { ...result, portable } });
+    } catch {}
+  }, testUpdateApi ? 1500 : 8000);
 }).catch(error => { dialog.showErrorBox('VekoTerm başlatılamadı', error.message); app.quit(); });
 app.on('window-all-closed', () => { sessions?.closeAll(); xserver?.stop(); app.quit(); });

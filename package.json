@@ -1,7 +1,7 @@
 {
   "name": "vekoterm",
   "productName": "VekoTerm",
-  "version": "0.4.4",
+  "version": "0.5.0",
   "description": "Açık kaynak terminal ve uzak bağlantı çalışma alanı",
   "author": "Vekosis Kurumsal Bilgi Sistemleri",
   "license": "MIT",
@@ -56,11 +56,12 @@
     "appId": "com.vekosis.vekterm",
     "productName": "VekoTerm",
     "directories": {
-      "output": "release/0.4.4"
+      "output": "release/${version}"
     },
     "files": [
       "dist/**/*",
       "electron/**/*",
+      "assets/vekterm.ico",
       "package.json",
       "LICENSE",
       "THIRD_PARTY_NOTICES.md",

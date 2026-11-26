@@ -11,7 +11,12 @@ import { terminalSelection } from './terminalSelection';
 import type { Session } from './types';
 import '@xterm/xterm/css/xterm.css';
 
-export function TerminalPane({ session, visible, fontSize, fontFamily = 'Cascadia Code', highlight = true, broadcast, peers, copyOnSelect, order = 0, showLabel = false, isActive = false, activate }: { fontFamily?: string; highlight?: boolean; order?: number; showLabel?: boolean; isActive?: boolean; activate?: () => void; session: Session; visible: boolean; fontSize: number; broadcast: boolean; peers: string[]; copyOnSelect: boolean }) {
+// Terminal colours per theme; the Zümrüt theme uses an obsidian background and an emerald cursor.
+const PALETTES = {
+  default: { background: '#000000', foreground: '#d2dae5', cursor: '#6ed0b6', selectionBackground: '#35524e' },
+  emerald: { background: '#060908', foreground: '#d6e5dd', cursor: '#34d399', selectionBackground: '#1d4a3a' }
+};
+export function TerminalPane({ session, visible, fontSize, fontFamily = 'Cascadia Code', highlight = true, broadcast, peers, copyOnSelect, order = 0, showLabel = false, isActive = false, activate, palette = 'default' }: { palette?: keyof typeof PALETTES; fontFamily?: string; highlight?: boolean; order?: number; showLabel?: boolean; isActive?: boolean; activate?: () => void; session: Session; visible: boolean; fontSize: number; broadcast: boolean; peers: string[]; copyOnSelect: boolean }) {
   const container = useRef<HTMLDivElement>(null), terminal = useRef<Terminal|null>(null), fit = useRef<FitAddon|null>(null), search = useRef<SearchAddon|null>(null);
   const viewport = useRef<HTMLDivElement>(null), tail = useRef<HTMLDivElement>(null);
   const highlighter = useRef<ReturnType<typeof terminalHighlights> | null>(null);
@@ -115,6 +120,7 @@ export function TerminalPane({ session, visible, fontSize, fontFamily = 'Cascadi
     return () => cancelAnimationFrame(frame);
   }, [fontSize, fontFamily]);
   useEffect(() => { highlighter.current?.setEnabled(highlight); }, [highlight]);
+  useEffect(() => { if (terminal.current) terminal.current.options.theme = PALETTES[palette] || PALETTES.default; }, [palette, session.id]);
   useEffect(() => { if (visible) requestAnimationFrame(() => { fit.current?.fit(); highlighter.current?.refresh(); if (isActive) terminal.current?.focus(); }); }, [visible, isActive, order]);
   useEffect(() => { if (!visible) setMenu(null); }, [visible]);
   return <div className="terminal-pane" onFocusCapture={() => { if (!isActive) activate?.(); }} style={{ display: visible ? 'flex' : 'none', order }}>

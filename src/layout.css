@@ -115,6 +115,8 @@
 .session-notice{display:flex;align-items:center;gap:10px;height:28px;flex-shrink:0;padding:0 12px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted);background:var(--panel)}
 .session-notice.problem{background:var(--danger-bg);color:var(--danger-text)}
 .session-notice .notice-target{color:var(--text)}
+.session-notice .notice-reconnect{color:var(--muted)}
+.session-notice button:not(.text-accent){color:var(--muted)}
 .session-notice .recording-badge{font-size:11px}
 .session-notice button.text-accent{padding:2px 0}
 
@@ -158,3 +160,141 @@
 .app-shell .statusbar{font-size:11px;background:var(--chrome);gap:8px}
 .app-shell .statusbar>button{font-size:11px}
 .app-shell .status-x{display:inline-flex;align-items:center;gap:5px;margin-left:0}
+/* Command history */
+.history-dialog{width:min(760px,94vw);max-height:calc(100vh - 140px)}
+.history-dialog>.dialog-body{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:10px}
+.history-search{display:flex;align-items:center;gap:8px;padding:0 10px;border:1px solid var(--line);border-radius:6px;background:var(--input);color:var(--muted)}
+.history-dialog .dialog-body .history-search input:not([type=checkbox]){flex:1;width:auto;height:34px;padding:0;border:0;background:transparent;color:var(--text);outline:none}
+.history-list{min-height:120px;max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+.history-row{display:flex;align-items:center;gap:10px;padding:7px 10px;border-bottom:1px solid var(--line)}
+.history-row:last-child{border-bottom:0}
+.history-row.selected{background:var(--accent-bg)}
+.history-text{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.history-text code{font-family:'Cascadia Code',Consolas,monospace;font-size:12.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.history-text small{font-size:11px;color:var(--muted)}
+.history-actions{display:flex;gap:2px;opacity:0}
+.history-row.selected .history-actions,.history-row:hover .history-actions{opacity:1}
+.history-actions button{display:grid;place-items:center;width:26px;height:26px;border:0;border-radius:5px;background:transparent;color:var(--muted)}
+.history-actions button:hover:not(:disabled){background:var(--raised);color:var(--text)}
+.history-actions button:disabled{opacity:.4}
+.history-empty{padding:18px;text-align:center}
+/* Macro variables and shortcuts */
+.saved-tool-list .shortcut-badge{margin-left:8px;padding:1px 6px;border:1px solid var(--line);border-radius:999px;font-size:10px;color:var(--muted)}
+.macro-run-dialog{width:min(560px,94vw);max-height:calc(100vh - 140px)}
+.macro-run-dialog>.dialog-body{min-height:0;overflow:auto}
+.macro-preview{border:1px solid var(--line);border-radius:6px;background:#000;max-height:180px;overflow:auto}
+.macro-preview pre{margin:0;padding:10px 12px;font-family:'Cascadia Code',Consolas,monospace;font-size:12px;line-height:1.5;color:#d6e2ef;white-space:pre-wrap;word-break:break-all}
+.field-hint code{font-family:'Cascadia Code',Consolas,monospace;font-size:11px;padding:0 3px;border-radius:3px;background:var(--raised)}
+/* Dialog content scrolls as a whole; a child with its own scroll (saved lists) must not shrink to nothing. */
+.dialog-body>*{flex-shrink:0}
+/* Server operations */
+.ops-dialog{width:min(980px,96vw);height:min(720px,calc(100vh - 140px));max-height:calc(100vh - 140px);display:flex;flex-direction:column}
+.ops-dialog .dialog-header h2 small{margin-left:10px;font-size:12px;font-weight:400;color:var(--muted)}
+.ops-toolbar{display:flex;align-items:center;gap:10px;padding:10px 25px;border-bottom:1px solid var(--line)}
+.ops-tabs{display:flex;gap:2px;padding:2px;border:1px solid var(--line);border-radius:7px;background:var(--input)}
+.ops-tabs button{padding:5px 12px;border:0;border-radius:5px;background:transparent;color:var(--muted);font-size:12px}
+.ops-tabs button.selected{background:var(--accent-bg);color:var(--accent)}
+.ops-search{flex:1}
+.ops-toolbar .history-search input:not([type=checkbox]){flex:1;width:auto;height:30px;padding:0;border:0;background:transparent;color:var(--text);outline:none}
+.ops-state{width:auto;height:32px;padding:0 8px;border:1px solid var(--line);border-radius:5px;background:var(--input);color:var(--text);font-size:12px}
+.ops-dialog>.ops-body{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;overflow:hidden}
+.ops-body>.ops-table{flex:1 1 auto;min-height:120px;overflow:auto;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+.ops-row{display:flex;align-items:center;gap:12px;padding:7px 12px;border-bottom:1px solid var(--line)}
+.ops-row:last-child{border-bottom:0}
+.ops-row:hover{background:var(--hover)}
+.ops-main{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.ops-main strong{font-family:'Cascadia Code',Consolas,monospace;font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ops-main small{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ops-pill{padding:2px 9px;border:1px solid var(--line);border-radius:999px;font-size:11px;color:var(--muted);white-space:nowrap}
+.ops-pill.active{color:#5fd39a;border-color:#2f7a55;background:#1d3a2c}
+.ops-pill.failed{color:#ff8a94;border-color:#8a3a44;background:#3a1d22}
+.ops-metric{width:96px;text-align:right;font-family:'Cascadia Code',Consolas,monospace;font-size:12px;color:var(--muted);white-space:nowrap}
+.ops-actions{display:flex;gap:2px}
+.ops-actions button{display:grid;place-items:center;width:28px;height:28px;border:0;border-radius:5px;background:transparent;color:var(--muted)}
+.ops-actions button:hover{background:var(--raised);color:var(--text)}
+.ops-body>.ops-log{flex:0 0 230px;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:6px;background:#000}
+.ops-log header{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px solid #222;color:#cfd8e3;font-size:12px}
+.ops-log pre{flex:1;margin:0;padding:10px 12px;overflow:auto;font:12px/1.5 'Cascadia Code',Consolas,monospace;color:#d6e2ef;white-space:pre-wrap;word-break:break-all}
+.ops-notice{padding:8px 12px;border:1px solid #2f7a55;border-radius:5px;background:#1d3a2c;color:#5fd39a;font-size:12px}
+.ops-sudo{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+.ops-sudo code{font-family:'Cascadia Code',Consolas,monospace;color:#ffd7db}
+.ops-confirm{gap:10px}.ops-confirm>span{flex:1;font-size:12px}
+/* Folder sync: this computer on the left, the server on the right */
+.sync-dialog{width:min(1100px,96vw);height:min(780px,calc(100vh - 140px));max-height:calc(100vh - 140px);display:flex;flex-direction:column}
+.sync-dialog .dialog-header h2 small{margin-left:10px;font-size:12px;font-weight:400;color:var(--muted)}
+.sync-sides{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:12px 25px 0}
+.sync-side{display:flex;flex-direction:column;gap:6px;min-width:0}
+.sync-side-label{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--muted)}
+.sync-path{display:flex;align-items:center;gap:8px;height:36px;padding:0 4px 0 10px;border:1px solid var(--line);border-radius:6px;background:var(--input);min-width:0}
+.sync-path>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:12px 'Cascadia Code',Consolas,monospace}
+.sync-path input{flex:1;min-width:0;height:32px;padding:0;border:0;background:transparent;color:var(--text);font:12px 'Cascadia Code',Consolas,monospace;outline:none}
+.sync-path .button{height:28px;padding:0 10px}
+.sync-options{display:flex;align-items:flex-end;gap:12px;padding:10px 25px 12px;border-bottom:1px solid var(--line)}
+.sync-options label{display:flex;flex-direction:column;gap:5px;font-size:11px;font-weight:600;color:var(--muted)}
+.sync-options label:first-child{flex:1;min-width:0}
+.sync-options input{height:32px;padding:0 10px;border:1px solid var(--line);border-radius:5px;background:var(--input);font-size:12px}
+.sync-options .button{height:32px}
+.sync-dialog>.sync-body{flex:1;min-height:0;max-height:none;display:flex;flex-direction:column;gap:10px;overflow:hidden}
+.sync-intro{margin:4px 0;line-height:1.55}
+.sync-summary{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.sync-summary>button{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--line);border-radius:999px;font-size:11.5px;color:var(--muted)}
+.sync-summary>button b{font-weight:600;color:var(--text)}
+.sync-summary>button.selected{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
+.sync-summary>button.selected b{color:var(--accent)}
+.sync-filter{margin-left:auto;width:210px}
+.sync-body .sync-filter input:not([type=checkbox]){height:28px;border:0;background:transparent;padding:0}
+.sync-table{flex:1 1 auto;min-height:120px;overflow:auto;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+.sync-row{display:grid;grid-template-columns:minmax(0,1fr) 150px 96px 150px;align-items:center;gap:14px;padding:6px 12px;border-bottom:1px solid var(--line)}
+.sync-row:last-child{border-bottom:0}
+.sync-row:not(.sync-head):hover{background:var(--hover)}
+.sync-head{position:sticky;top:0;z-index:1;background:var(--raised);font-size:11px;font-weight:600;color:var(--muted)}
+.sync-dir-head{text-align:center}
+.sync-name{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;min-width:0;color:var(--muted)}
+.sync-name strong{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:500 12.5px 'Cascadia Code',Consolas,monospace;color:var(--text)}
+.sync-name small{flex-basis:100%;font-size:11px}
+.status-local .sync-name small,.status-local-newer .sync-name small{color:var(--accent)}
+.status-remote .sync-name small,.status-remote-newer .sync-name small{color:#4fa8d6}
+.status-different .sync-name small,.status-conflict .sync-name small{color:#d6a04f}
+.sync-side-cell{display:flex;flex-direction:column;gap:1px;font:12px 'Cascadia Code',Consolas,monospace;color:var(--text);white-space:nowrap}
+.sync-side-cell small{font:11px inherit;font-family:inherit;color:var(--muted)}
+.sync-none{color:var(--subtle)}
+.sync-direction{display:flex;justify-content:center;gap:2px;padding:2px;border:1px solid var(--line);border-radius:6px;background:var(--input)}
+.sync-direction button{display:grid;place-items:center;width:28px;height:22px;border-radius:4px;color:var(--muted)}
+.sync-direction button.selected{background:var(--accent-bg);color:var(--accent)}
+.sync-direction button[aria-checked=true][title="Dokunma"]{background:var(--raised);color:var(--text)}
+.sync-direction button:disabled{opacity:.25}
+.sync-footer>span{flex:1;display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)}
+.sync-footer>span strong{color:var(--text)}
+.sync-issues{margin:6px 0 0;padding-left:18px;font-size:11.5px;line-height:1.5}
+/* In-app update */
+.update-dialog{width:min(640px,94vw);max-height:calc(100vh - 140px)}
+.update-body{gap:12px}
+.update-status{display:flex;align-items:center;gap:8px;margin:0;font-size:13px}
+.update-status.ok svg{color:var(--accent)}
+.update-head{display:flex;flex-direction:column;gap:3px}
+.update-head strong{font-size:16px}
+.update-head span{font-size:12px;color:var(--muted)}
+.update-notes{max-height:300px;overflow:auto;padding:12px 14px;border:1px solid var(--line);border-radius:6px;background:var(--input);font-size:12.5px;line-height:1.55}
+.update-notes h4{margin:12px 0 4px;font-size:13px}
+.update-notes h4:first-child{margin-top:0}
+.update-notes p{margin:0 0 8px}
+.update-notes ul{margin:0 0 8px;padding-left:18px}
+.update-notes li{margin:2px 0}
+.update-notes code{padding:1px 3px;border-radius:3px;background:var(--raised);font:11.5px 'Cascadia Code',Consolas,monospace}
+.update-notes pre{margin:0 0 8px;padding:8px 10px;overflow:auto;border-radius:5px;background:var(--raised);font:11.5px 'Cascadia Code',Consolas,monospace}
+.update-progress{display:flex;flex-direction:column;gap:5px}
+.update-progress>div{height:6px;border-radius:3px;background:var(--raised);overflow:hidden}
+.update-progress>div>span{display:block;height:100%;background:var(--accent);transition:width .2s}
+.update-progress small{font-size:11.5px;color:var(--muted)}
+.update-footer>span{flex:1}
+.statusbar .status-update{color:var(--accent);font-weight:600}
+/* Settings sections */
+.settings-dialog .settings-section{margin:10px 0 -2px;padding-top:14px;border-top:1px solid var(--line);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.settings-dialog .settings-section:first-child{margin-top:0;padding-top:0;border-top:0}
+/* Light theme colours for the server operations and folder sync windows */
+:root[data-theme=light] .ops-pill.active{color:#1f7438;border-color:#a9d8b7;background:#e5f5ea}
+:root[data-theme=light] .ops-pill.failed{color:#b8323d;border-color:#efbcc1;background:#fbe8ea}
+:root[data-theme=light] .ops-notice{color:#1f7438;border-color:#a9d8b7;background:#e5f5ea}
+:root[data-theme=light] .ops-sudo code{color:#8a2430}
+:root[data-theme=light] :is(.status-remote,.status-remote-newer) .sync-name small{color:#2b6aa3}
+:root[data-theme=light] :is(.status-different,.status-conflict) .sync-name small{color:#94600c}

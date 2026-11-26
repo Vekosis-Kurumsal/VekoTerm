@@ -14,12 +14,14 @@ Windows için açık kaynak terminal ve uzak bağlantı çalışma alanı. SSH, 
 - Uygulama içinde VNC (noVNC), Telnet, seri port, FTP/FTPS
 - Yerel, uzak ve dinamik (SOCKS5) SSH tünelleri; kayıtlı tüneller ayrı başlatılıp durdurulabilir
 - Pakete dahil X sunucusu (VcXsrv) ve SSH X11 yönlendirme
+- SSH veya SFTP bağlantısı koparsa aynı sekmede otomatik yeniden bağlanma (deneme sayısı ve bekleme ayarlanabilir)
 
 **Dosyalar**
 - Dosya ve klasör yükleme/indirme, Windows'tan sürükle-bırak, çoklu seçim, izinler, yeni dosya, onaylı silme
 - Aktarım iptali; tek dosyada SHA-256 doğrulamalı kaldığı yerden devam
 - Yerleşik düzenleyici (CodeMirror; sözdizimi renklendirme, arama/değiştirme)
 - Terminalin bulunduğu klasörü izleyen dosya paneli; yerel dosya/klasör karşılaştırma
+- Klasör eşitleme: bilgisayardaki bir klasörü sunucudakiyle yan yana karşılaştırır, seçilen dosyaları iki yönde kopyalar. Hiçbir dosyayı silmez, hedefte daha yeni olan dosyanın üzerine yazmaz.
 
 **Oturum yönetimi**
 - Klasörlü bağlantı ağacı, favoriler, arama, hızlı bağlan (`kullanıcı@sunucu[:port]` veya kayıtlı bağlantı adı)
@@ -28,15 +30,19 @@ Windows için açık kaynak terminal ve uzak bağlantı çalışma alanı. SSH, 
 - VekoTerm JSON içe/dışa aktarma ve parolaları da taşıyan, parola korumalı `.vekobak` yedeği
 
 **Terminal**
-- Çoklu komut (seçili terminallere aynı anda yazma), makro kaydı ve oynatma
+- Çoklu komut (seçili terminallere aynı anda yazma), makro kaydı ve oynatma; makrolarda `{değişken}` alanları ve Alt+1…9 kısayolları
+- Komut geçmişi (Ctrl+Shift+H): sunucuya ve bilgisayara göre süzme, arama, yeniden çalıştırma. Parola sorularına yazılanlar ve parola içeren komutlar kaydedilmez.
 - Çıktıyı dosyaya kaydetme ve dışa aktarma, terminalde arama, seçince kopyalama, geçmişte kaydırarak seçim, "Tümünü kopyala"
 - Komutların ve önemli çıktıların renklendirilmesi (HATA, UYARI, TAMAM gibi durum etiketleri dahil); yalnız görüntüye uygulanır
 - "Kayıtlı parolayı yapıştır" (Ctrl+Shift+P): sunucudaki sudo sorusuna bağlantının parolasını, yerel terminaldeki `kullanıcı@sunucu's password:` sorusuna eşleşen kayıtlı bağlantının parolasını gönderir
 
 **Diğer**
 - Uzak Linux sunucu için CPU, bellek, disk, ağ ve çalışma süresi çubuğu
+- Sunucu işlemleri (Ctrl+Shift+O): systemd servisleri ve günlükleri, süreçler, Docker konteynerleri; başlat, durdur, yeniden başlat
 - SSH anahtar aracı (Ed25519, RSA 4096, ECDSA 256), ağ araçları (port, DNS, ping, yol izleme)
-- İsteğe bağlı ana parola ile uygulama kilidi, açık/koyu tema, `--portable` taşınabilir veri modu
+- İsteğe bağlı ana parola ile uygulama kilidi, Koyu, Açık ve Zümrüt tema, `--portable` taşınabilir veri modu
+- Tek pencere; kapatınca çıkma, sistem tepsisine küçültme ya da sorma seçeneği
+- Uygulama içi güncelleme: yeni sürüm durum çubuğunda görünür, kurulum dosyası SHA-256 özeti doğrulanarak indirilir
 
 ## Kurulum
 
@@ -49,6 +55,8 @@ Kullanıcı verileri `%APPDATA%\VekTerm` altında tutulur; kaldırma işlemi bu 
 - Kayıtlı parolalar Windows'un kullanıcıya bağlı koruması (DPAPI, Electron `safeStorage`) ile şifrelenir. İsteğe bağlı ana parola kasası kayıt dosyasının tamamını scrypt + AES-256-GCM ile korur.
 - Arayüz (renderer) Node.js yetkisi olmadan çalışır; ayrıcalıklı işlemler yalnız preload'da tanımlı dar IPC metotlarıyla yapılır.
 - "Kayıtlı parolayı yapıştır" parolayı arayüze getirmez; yalnız terminalin son satırında parola sorusu görünüyorsa ana süreçten doğrudan bağlantıya yazar. Makro kaydına ve çoklu komuta girmez.
+- Güncelleme denetimi yalnız bu deponun GitHub'da yayımlanmış sürümünü okur ve bilgisayardan bilgi göndermez. İndirilen kurulum dosyası sürümde yayımlanan SHA-256 özetiyle eşleşmezse silinir ve çalıştırılmaz.
+- Sunucu işlemleri servis, konteyner adlarını ve süreç numaralarını sunucuya göndermeden önce denetler; yönetici yetkisi gereken işlemler parola sormayan `sudo -n` ile denenir, parola gerekiyorsa komut kullanıcının onayıyla terminale yazılır.
 - Güvenlik açığı bildirimi için: vekosis@vekosis.com
 
 ## Kaynaktan derleme
@@ -69,6 +77,8 @@ pnpm package
 ```
 
 `pnpm package` kurulum dosyasını `release/<sürüm>/VekoTerm-Setup-<sürüm>-x64.exe` olarak üretir.
+
+Yayımlanan sürümler GitHub Actions ile üretilir (`.github/workflows/release.yml`). `package.json` sürümü artırılıp `.github/release-notes/<sürüm>.md` notu eklendikten sonra `v<sürüm>` etiketi gönderilir. İş akışı kurulum dosyasını, SHA256 özetini ve `latest.yml` dosyasını üretip taslak bir sürüm açar; taslak GitHub'da gözden geçirilip yayımlanır.
 
 ## Proje yapısı
 

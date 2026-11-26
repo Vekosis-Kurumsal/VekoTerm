@@ -1,0 +1,110 @@
+# Builds the Windows installer when a version tag (v1.2.3) is pushed and opens a draft GitHub release with it.
+# The draft becomes public only after it is reviewed and published on GitHub.
+# Started by hand (Run workflow), it only builds and keeps the files as a workflow artifact.
+name: Sürüm
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    name: Windows kurulum dosyası
+    runs-on: windows-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Bağımlılıklar
+        run: pnpm install --frozen-lockfile
+
+      - name: Sürüm ve etiket
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") {
+            throw "Etiket $env:GITHUB_REF_NAME ile package.json sürümü $version aynı değil."
+          }
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and -not (Test-Path ".github/release-notes/$version.md")) {
+            throw "Sürüm notu bulunamadı: .github/release-notes/$version.md"
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Tür denetimi
+        run: pnpm check
+
+      - name: X sunucusu (VcXsrv)
+        run: pnpm prepare:x11
+
+      - name: Kurulum dosyası
+        run: pnpm package
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: SHA256 özeti ve sürüm notu
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $dir = "release/$env:VERSION"; $exe = "VekoTerm-Setup-$env:VERSION-x64.exe"
+          $hash = (Get-FileHash "$dir/$exe" -Algorithm SHA256).Hash
+          Set-Content -Path "$dir/$exe.sha256" -Value "$hash  $exe" -Encoding ascii
+          $notes = ".github/release-notes/$env:VERSION.md"
+          $body = if (Test-Path $notes) { (Get-Content $notes -Raw -Encoding utf8).TrimEnd() } else { "VekoTerm $env:VERSION" }
+          $install = @'
+          ## Kurulum
+
+          `VekoTerm-Setup-{VERSION}-x64.exe` dosyasını indirip çalıştırın (Windows 10/11, x64). Önceki sürümün üzerine kurulabilir; `%APPDATA%\VekTerm` altındaki bağlantılarınız korunur.
+
+          Kurulum dosyası **imzasızdır**. Windows SmartScreen uyarı gösterirse **Ek bilgi → Yine de çalıştır** ile devam edebilirsiniz. Dosyayı aşağıdaki özetle doğrulayabilirsiniz:
+
+          ```
+          SHA256  {HASH}  VekoTerm-Setup-{VERSION}-x64.exe
+          ```
+
+          PowerShell'de: `Get-FileHash .\VekoTerm-Setup-{VERSION}-x64.exe -Algorithm SHA256`
+          '@
+          $install = $install.Replace('{VERSION}', $env:VERSION).Replace('{HASH}', $hash)
+          Set-Content -Path "$dir/release-notes.md" -Value "$body`n`n$install" -Encoding utf8
+          Get-Content "$dir/$exe.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VekoTerm-${{ steps.version.outputs.version }}
+          path: |
+            release/${{ steps.version.outputs.version }}/VekoTerm-Setup-*.exe
+            release/${{ steps.version.outputs.version }}/VekoTerm-Setup-*.exe.sha256
+            release/${{ steps.version.outputs.version }}/latest.yml
+            release/${{ steps.version.outputs.version }}/release-notes.md
+          if-no-files-found: error
+
+      - name: Taslak GitHub sürümü
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $dir = "release/$env:VERSION"; $exe = "VekoTerm-Setup-$env:VERSION-x64.exe"
+          gh release create $env:GITHUB_REF_NAME "$dir/$exe" "$dir/$exe.sha256" "$dir/latest.yml" --draft --verify-tag --title "VekoTerm $env:VERSION" --notes-file "$dir/release-notes.md"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }

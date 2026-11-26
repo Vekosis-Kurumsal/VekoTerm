@@ -67,6 +67,11 @@ function passwordPrompt(buffer) {
   if (/passphrase/i.test(tail) || !/(?:password|parola|şifre)[^\n]{0,80}:\s*$/iu.test(tail) || line.length > 200) return null;
   return { user: tail.match(/password for ([^\s:]+)/i)?.[1] || tail.match(/(\S+) için (?:parola|şifre)/iu)?.[1] || '', host: '' };
 }
+// {name} placeholders in macros. A name starts with a letter and the braces stand alone, so shell braces such as
+// {{.Names}}, ${HOME} and '{print $1}' are left as they are.
+const MACRO_VARIABLE = /(?<![$\{])\{(\p{L}[\p{L}\p{N}_-]{0,39})\}(?!\})/gu;
+function macroVariables(text) { return [...new Set([...String(text).matchAll(MACRO_VARIABLE)].map(m => m[1]))]; }
+function fillMacro(text, values) { return String(text).replace(MACRO_VARIABLE, (_, name) => values[name]); }
 const methods = {
   duplicateSession(id) { const s = this.get(id); return this.open({ ...s.profile, password: s.authInput?.password }); },
   // Answers a password question with a password VekoTerm already holds, only when the user asks.
@@ -120,16 +125,24 @@ const methods = {
     s.recording = ''; s.recordingActive = true; s.public = { ...s.public, recording: true }; this.emitState(s);
   },
   stopRecording(id) { const s = this.get(id), result = recordedCommands(s.recording || ''); s.recording = ''; s.recordingActive = false; s.public = { ...s.public, recording: false }; this.emitState(s); return result; },
-  startMacro(macroId, ids) {
+  startMacro(macroId, ids, values = {}) {
     const macro = this.store.data.macros?.find(m => m.id === macroId); if (!macro) throw new Error('Makro bulunamadı.');
+    // Each {name} needs a one-line value; a line break in a value would run an extra command.
+    const names = macroVariables(macro.commands);
+    for (const name of names) {
+      const value = values?.[name];
+      if (typeof value !== 'string' || !value.trim() || value.length > 1000 || /[\x00-\x1f\x7f]/.test(value)) throw new Error(`“${name}” için bir değer yazın. Değer tek satır olmalı.`);
+    }
+    const commands = names.length ? fillMacro(macro.commands, values) : macro.commands;
     if (!Array.isArray(ids) || !ids.length || ids.length > 100) throw new Error('Hedef terminal seçin.');
     const targets = [...new Set(ids)]; for (const id of targets) { const s = this.get(id); if (s.status !== 'connected' || !['ssh', 'local', 'telnet','serial'].includes(s.profile.type)) throw new Error('Yalnız açık terminaller seçilebilir.'); }
+    if (names.length) { this.store.data.macroVariables = { ...(this.store.data.macroVariables || {}), ...Object.fromEntries(names.map(name => [name, values[name]])) }; this.store.flushSoon?.(); }
     this.macroJobs ||= new Map(); const id = randomUUID(), controller = new AbortController(); this.macroJobs.set(id, controller);
     const report = (status, message) => this.emit('event', { type: 'macroState', macro: { id, name: macro.name, status, message } });
     report('running');
     (async () => {
       try {
-        for (const command of macro.commands.split(/\r?\n/)) {
+        for (const command of commands.split(/\r?\n/)) {
           controller.signal.throwIfAborted();
           for (const target of targets) { if (this.get(target).status !== 'connected') throw new Error('Hedef bağlantı kapandı.'); this.input(target, command + '\r'); }
           await new Promise(resolve => { const timer = setTimeout(done, macro.delayMs); function done() { clearTimeout(timer); controller.signal.removeEventListener('abort', done); resolve(); } controller.signal.addEventListener('abort', done, { once: true }); });
@@ -142,4 +155,4 @@ const methods = {
   },
   stopMacro(id) { this.macroJobs?.get(id)?.abort(new Error('Makro durduruldu.')); }
 };
-module.exports = { methods, PlainLog, recordedCommands, passwordPrompt, stripEscapes };
+module.exports = { methods, PlainLog, recordedCommands, passwordPrompt, stripEscapes, macroVariables, fillMacro };

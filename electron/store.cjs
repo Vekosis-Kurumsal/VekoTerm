@@ -192,16 +192,39 @@ class Store {
     if (tunnels.length) throw new Error(`Bu bağlantıyı kullanan kayıtlı tüneller var: ${tunnels.join(', ')}. Önce tünelleri silin.`);
     this.data.profiles = this.data.profiles.filter(p => p.id !== id); delete this.data.secrets[id]; this.flush();
   }
+  // Command history lives with the other records (sealed too when the master password is on). Writing after every
+  // command would rewrite the whole file, so it is saved a moment later.
+  history() { return this.locked ? [] : (this.data.commandHistory || []); }
+  addHistory(entry) { if (this.locked) return; this.data.commandHistory = require('./command-history.cjs').addEntry(this.data.commandHistory || [], entry); this.flushSoon(); }
+  removeHistory(id) { this.data.commandHistory = (this.data.commandHistory || []).filter(e => e.id !== id); this.flush(); }
+  clearHistory() { this.data.commandHistory = []; this.flush(); }
+  // The folder pair last used for folder sync, per connection (kept for at most 200 connections).
+  syncPair(key) { return this.locked ? null : (this.data.syncPairs || {})[key] || null; }
+  saveSyncPair(key, pair) {
+    if (this.locked) return;
+    const pairs = { ...(this.data.syncPairs || {}) }; delete pairs[key];
+    pairs[key] = { local: String(pair.local), remote: String(pair.remote), exclude: String(pair.exclude || '').slice(0, 2000) };
+    const keys = Object.keys(pairs); for (const old of keys.slice(0, Math.max(0, keys.length - 200))) delete pairs[old];
+    this.data.syncPairs = pairs; this.flushSoon();
+  }
+  flushSoon() { clearTimeout(this.flushTimer); this.flushTimer = setTimeout(() => this.flushPending(), 1500); }
+  flushPending() { if (!this.flushTimer) return; clearTimeout(this.flushTimer); this.flushTimer = null; try { if (!this.locked) this.flush(); } catch {} }
   trust(host, port, fingerprint) { this.data.knownHosts[`${host}:${port}`] = fingerprint; this.flush(); }
   known(host, port) { return this.data.knownHosts[`${host}:${port}`]; }
   preferences(input) {
     this.data.preferences = {
-      theme: ['light', 'dark'].includes(input.theme) ? input.theme : this.data.preferences.theme,
+      theme: ['light', 'dark', 'emerald'].includes(input.theme) ? input.theme : this.data.preferences.theme,
       fontSize: Math.max(11, Math.min(24, Number(input.fontSize) || this.data.preferences.fontSize)),
       fontFamily: ['Cascadia Code', 'Cascadia Mono', 'Consolas', 'Lucida Console', 'Courier New', 'JetBrains Mono', 'Fira Code'].includes(input.fontFamily) ? input.fontFamily : (this.data.preferences.fontFamily || 'Cascadia Code'),
       copyOnSelect: typeof input.copyOnSelect === 'boolean' ? input.copyOnSelect : this.data.preferences.copyOnSelect,
       compact: typeof input.compact === 'boolean' ? input.compact : !!this.data.preferences.compact,
-      terminalHighlights: typeof input.terminalHighlights === 'boolean' ? input.terminalHighlights : this.data.preferences.terminalHighlights !== false
+      terminalHighlights: typeof input.terminalHighlights === 'boolean' ? input.terminalHighlights : this.data.preferences.terminalHighlights !== false,
+      closeAction: ['quit', 'tray', 'ask'].includes(input.closeAction) ? input.closeAction : (this.data.preferences.closeAction || 'quit'),
+      autoReconnect: typeof input.autoReconnect === 'boolean' ? input.autoReconnect : this.data.preferences.autoReconnect !== false,
+      reconnectAttempts: Math.max(1, Math.min(20, Math.round(Number(input.reconnectAttempts)) || this.data.preferences.reconnectAttempts || 5)),
+      reconnectDelay: Math.max(2, Math.min(60, Math.round(Number(input.reconnectDelay)) || this.data.preferences.reconnectDelay || 5)),
+      commandHistory: typeof input.commandHistory === 'boolean' ? input.commandHistory : this.data.preferences.commandHistory !== false,
+      updateCheck: typeof input.updateCheck === 'boolean' ? input.updateCheck : this.data.preferences.updateCheck !== false
     }; this.flush(); return this.data.preferences;
   }
   saveTunnel(input) {
@@ -214,7 +237,9 @@ class Store {
   removeTunnel(id) { this.data.tunnels = (this.data.tunnels || []).filter(t => t.id !== id); this.flush(); }
   saveMacro(input) {
     if (!input || typeof input.name !== 'string' || !input.name.trim() || typeof input.commands !== 'string' || !input.commands.trim() || input.commands.length > 65536 || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(input.commands)) throw new Error('Makro adını ve komutlarını kontrol edin.');
-    const macro = { id: /^[a-z0-9-]{1,80}$/i.test(input.id || '') ? input.id : randomUUID(), name: input.name.trim().slice(0, 100), commands: input.commands.replace(/\r\n/g, '\n'), delayMs: Math.max(0, Math.min(10000, Number.isFinite(Number(input.delayMs)) ? Number(input.delayMs) : 150)) };
+    const macro = { id: /^[a-z0-9-]{1,80}$/i.test(input.id || '') ? input.id : randomUUID(), name: input.name.trim().slice(0, 100), commands: input.commands.replace(/\r\n/g, '\n'), delayMs: Math.max(0, Math.min(10000, Number.isFinite(Number(input.delayMs)) ? Number(input.delayMs) : 150)), shortcut: [1, 2, 3, 4, 5, 6, 7, 8, 9].includes(Number(input.shortcut)) ? Number(input.shortcut) : 0 };
+    // One macro per Alt+number: giving the key to this macro takes it from the other one.
+    if (macro.shortcut) for (const other of this.data.macros || []) if (other.id !== macro.id && other.shortcut === macro.shortcut) other.shortcut = 0;
     this.data.macros ||= []; const index = this.data.macros.findIndex(m => m.id === macro.id); if (index < 0) this.data.macros.push(macro); else this.data.macros[index] = macro;
     this.flush(); return macro;
   }

@@ -74,6 +74,8 @@ class Sessions extends EventEmitter {
   async openSSH(s, input) {
     const p = s.profile;
     const client = await require('./ssh-connection.cjs').call(this, s, p, input); s.client = client;
+    // Said before the new shell prints its prompt, so the cursor stays at the prompt.
+    if (s.reconnecting) { s.reconnecting = false; this.output(s, '\r\n\x1b[32mYeniden bağlandı.\x1b[0m\r\n'); }
     let x11;
     if (p.x11) x11 = await this.options.startX11?.();
     client.on('x11', (_info, accept, reject) => {
@@ -82,16 +84,24 @@ class Sessions extends EventEmitter {
       socket.once('connect', () => { const channel = accept(); socket.pipe(channel).pipe(socket); channel.on('error', () => socket.destroy()); });
       socket.on('error', () => { socket.destroy(); reject(); });
     });
-    client.on('close', () => { if (this.items.get(s.id) !== s) return; if (!['error', 'closed'].includes(s.status)) { s.status = 'closed'; this.emitState(s); } this.dispose(s); });
-    client.on('error', error => { if (s.status === 'connected') { this.output(s, `\r\n${error.message}\r\n`); s.status = 'error'; this.emitState(s); } });
+    // A connection that drops while in use (not a shell "exit" and not a closed tab) may reconnect in the same tab.
+    client.on('close', () => {
+      if (this.items.get(s.id) !== s || s.client !== client) return;
+      if (s.status === 'connected') s.dropped = true;
+      if (!['error', 'closed'].includes(s.status)) { s.status = 'closed'; this.emitState(s); }
+      const password = s.authInput?.password; this.dispose(s);
+      if (s.dropped) { s.dropped = false; this.scheduleReconnect(s, password); }
+    });
+    client.on('error', error => { if (s.client === client && s.status === 'connected') { this.output(s, `\r\n${error.message}\r\n`); s.status = 'error'; s.dropped = true; this.emitState(s); } });
     if (p.type === 'ssh') {
-      s.stream = await new Promise((resolve, reject) => client.shell({ term: 'xterm-256color', cols: 100, rows: 28 }, x11 ? { x11: { single: false, protocol: 'MIT-MAGIC-COOKIE-1', cookie: x11.cookie, screen: 0 } } : {}, (err, stream) => err ? reject(err) : resolve(stream)));
+      s.stream = await new Promise((resolve, reject) => client.shell({ term: 'xterm-256color', cols: s.size?.cols || 100, rows: s.size?.rows || 28 }, x11 ? { x11: { single: false, protocol: 'MIT-MAGIC-COOKIE-1', cookie: x11.cookie, screen: 0 } } : {}, (err, stream) => err ? reject(err) : resolve(stream)));
       s.stream.on('data', data => this.output(s, data));
       s.stream.stderr.on('data', data => this.output(s, data));
       s.stream.on('exit', code => { s.shellExited = Number.isInteger(code); });
       s.stream.on('close', () => {
         if (this.items.get(s.id) !== s) return;
         if (s.shellExited && s.status !== 'error') { this.close(s.id); return; }
+        if (s.status === 'connected') s.dropped = true;
         client.end(); if (s.status !== 'error') { s.status = 'closed'; this.emitState(s); }
       });
       s.stream.on('error', error => this.output(s, `\r\n${error.message}\r\n`));
@@ -100,8 +110,17 @@ class Sessions extends EventEmitter {
     catch (error) { if (p.type === 'sftp') throw error; this.output(s, `\r\nDosya paneli kullanılamıyor: ${error.message}\r\n`); }
     if (p.type === 'sftp') this.output(s, '\r\nSFTP bağlantısı hazır. Dosyaları soldaki panelden yönetebilirsiniz.\r\n');
   }
+  // Keys typed by the user (not macros or the saved-password paste): finished command lines go to the history.
+  userInput(id, data) {
+    const s = this.get(id);
+    if (s.status === 'connected' && typeof data === 'string' && data.length <= 1024 * 1024 && ['ssh', 'local', 'telnet', 'serial'].includes(s.profile.type) && this.store.data?.preferences?.commandHistory !== false && !this.store.locked && this.store.addHistory) {
+      const history = require('./command-history.cjs');
+      history.trackInput(s, data, command => { this.store.addHistory(history.entryFor(s, command)); this.emit('event', { type: 'history' }); });
+    }
+    return this.input(id, data);
+  }
   input(id, data) { const s = this.get(id); if (typeof data !== 'string' || data.length > 1024 * 1024) throw new Error('Girdi çok uzun.'); if (s.status !== 'connected') return; if (s.recordingActive) { if (s.recording.length + data.length > 65536) { s.recordingActive = false; s.public = { ...s.public, recording: true }; this.emitState(s); this.emit('event', { type: 'notice', message: 'Makro kaydı sınırına ulaşıldı. Kaydı durdurup gözden geçirin.' }); } else s.recording += data; } if (s.pty) s.pty.write(data); else s.stream?.write(data); }
-  resize(id, cols, rows) { const s = this.get(id); if (!Number.isInteger(cols) || !Number.isInteger(rows) || cols < 2 || rows < 2 || cols > 1000 || rows > 500) return; try { s.pty?.resize(cols, rows); s.stream?.setWindow(rows, cols, 0, 0); } catch {} }
+  resize(id, cols, rows) { const s = this.get(id); if (!Number.isInteger(cols) || !Number.isInteger(rows) || cols < 2 || rows < 2 || cols > 1000 || rows > 500) return; s.size = { cols, rows }; try { s.pty?.resize(cols, rows); s.stream?.setWindow(rows, cols, 0, 0); } catch {} }
   dispose(s) {
     try { s.log?.close(); } catch {} s.log = null; s.authInput = null; s.recording = ''; s.recordingActive = false;
     if (s.public?.logging || s.public?.recording) { s.public = { ...s.public, logging: false, recording: false }; this.emitState(s); }
@@ -114,12 +133,61 @@ class Sessions extends EventEmitter {
     const s = this.items.get(id);
     // Forget the session before closing resources: their late events must not reopen its tab.
     this.items.delete(id);
-    if (s) { s.status = 'closed'; clearTimeout(s.timer); s.timer = null; }
+    if (s) { s.status = 'closed'; clearTimeout(s.timer); s.timer = null; clearTimeout(s.reconnectTimer); s.reconnectTimer = null; s.reconnectPassword = null; }
     for (const job of this.jobs?.values() || []) if (job.sessionId === id && job.status === 'running') this.cancelTransfer(job.id);
     this.emit('event', { type: 'removed', id });
     if (s) this.dispose(s);
   }
   closeAll() { for (const job of this.macroJobs?.values() || []) job.abort(); for (const id of this.items.keys()) this.close(id); }
+  // Automatic reconnect after a dropped SSH/SFTP connection, in the same tab so the terminal history stays.
+  // Waits grow with each attempt; it never asks for anything, so it only runs when the password is at hand.
+  scheduleReconnect(s, password) {
+    const prefs = this.store.data?.preferences || {};
+    if (password) s.reconnectPassword = password;
+    if (prefs.autoReconnect === false || !['ssh', 'sftp'].includes(s.profile.type) || this.items.get(s.id) !== s) return;
+    const max = prefs.reconnectAttempts || 5, attempt = (s.reconnectAttempt || 0) + 1;
+    if (attempt > max) { s.reconnectAttempt = 0; this.setReconnect(s, null); this.output(s, `\r\n\x1b[31m${max} denemede yeniden bağlanılamadı. “Yeniden bağlan” ile tekrar deneyebilirsiniz.\x1b[0m\r\n`); return; }
+    const passwordAtHand = s.reconnectPassword || (this.store.secretState?.(s.profile.id) || { hasSecret: !!this.store.data?.secrets?.[s.profile.id] }).hasSecret;
+    if (['password', 'interactive'].includes(s.profile.auth) && !passwordAtHand) { this.output(s, '\r\n\x1b[33mBağlantı koptu. Parola gerektiği için otomatik olarak yeniden bağlanılmadı; “Yeniden bağlan” ile bağlanabilirsiniz.\x1b[0m\r\n'); return; }
+    const delay = Math.min(120, (prefs.reconnectDelay || 5) * attempt);
+    s.reconnectAttempt = attempt;
+    this.output(s, `\r\n\x1b[33mBağlantı koptu. ${delay} saniye sonra yeniden bağlanılacak (${attempt}/${max}).\x1b[0m\r\n`);
+    this.setReconnect(s, { attempt, max, at: Date.now() + delay * 1000 });
+    s.reconnectTimer = setTimeout(() => { s.reconnectTimer = null; this.reconnect(s.id, { automatic: true }).catch(() => {}); }, delay * 1000);
+  }
+  setReconnect(s, value) {
+    clearTimeout(s.reconnectTimer); s.reconnectTimer = null;
+    s.public = { ...s.public, reconnect: value }; this.emitState(s);
+  }
+  cancelReconnect(id) {
+    const s = this.get(id); if (!s.public?.reconnect) return;
+    s.reconnectAttempt = 0; this.setReconnect(s, null); this.output(s, '\r\nOtomatik yeniden bağlanma durduruldu.\r\n');
+  }
+  async reconnect(id, { automatic = false } = {}) {
+    const s = this.get(id);
+    if (!['ssh', 'sftp'].includes(s.profile.type)) return this.duplicateSession(id);
+    if (['connecting', 'connected'].includes(s.status)) return this.info(s);
+    if (!automatic) s.reconnectAttempt = 0;
+    this.setReconnect(s, null);
+    Object.assign(s, { status: 'connecting', authInput: { password: s.reconnectPassword || '' }, resources: [], client: null, stream: null, sftp: null, shellExited: false, dropped: false, trustError: null, noPrompt: automatic, reconnecting: true });
+    this.emitState(s);
+    if (!automatic) this.output(s, '\r\nYeniden bağlanılıyor…\r\n');
+    try {
+      await this.openSSH(s, { password: s.reconnectPassword || '' });
+      if (this.items.get(s.id) !== s) throw new Error('Bağlantı iptal edildi.');
+      s.noPrompt = false; s.reconnectAttempt = 0; s.reconnectPassword = s.authInput?.password || s.reconnectPassword;
+      s.status = 'connected'; this.emitState(s);
+      return this.info(s);
+    } catch (error) {
+      s.noPrompt = false; s.reconnecting = false;
+      if (this.items.get(s.id) !== s) throw error;
+      this.output(s, `\r\n\x1b[31m${error.message}\x1b[0m\r\n`);
+      const password = s.authInput?.password;
+      s.status = 'error'; this.emitState(s); this.dispose(s);
+      if (automatic) this.scheduleReconnect(s, password);
+      throw error;
+    }
+  }
   target(s, value) { if (typeof value !== 'string' || value.includes('\0')) throw new Error('Geçersiz yol.'); return s.profile.type === 'local' ? path.resolve(value || s.home) : path.posix.resolve(s.home || '/', value || '.'); }
   async list(id, dir) {
     const s = this.get(id), folder = this.target(s, dir);
@@ -255,6 +323,8 @@ class Sessions extends EventEmitter {
 Object.assign(Sessions.prototype, require('./file-actions.cjs'));
 Object.assign(Sessions.prototype, require('./transfers.cjs'));
 Object.assign(Sessions.prototype, require('./remote-tools.cjs').methods);
+Object.assign(Sessions.prototype, require('./host-ops.cjs').methods);
+Object.assign(Sessions.prototype, require('./folder-sync.cjs').methods);
 Object.assign(Sessions.prototype, require('./tunnels.cjs').methods);
 Object.assign(Sessions.prototype, require('./session-tools.cjs').methods);
 module.exports = { Sessions, safeName, MAX_EDIT };

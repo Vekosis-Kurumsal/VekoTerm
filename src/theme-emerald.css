@@ -1,0 +1,68 @@
+/* Zümrüt: a dark theme with an obsidian background, emerald accents, rounded cards and pill-shaped tabs and tags.
+   Only colours and shapes change; every part stays where it is in the other themes. */
+:root[data-theme=emerald]{
+  color:#dce8e2;background:#080b0a;
+  --bg:#080b0a;--panel:#0d1210;--raised:#131a17;--hover:#18221e;--line:#1e2a25;--text:#dce8e2;--muted:#8ba197;--subtle:#5e7268;
+  --accent:#34d399;--accent-bg:#0d3527;--input:#0a0f0d;--toolbar:#0b100e;--shadow:0 28px 90px #000c;--white:#effaf5;
+  --chrome:#090d0c;--popup:#111815;--icon-local:#8fb6a6;--icon-star:#e7c46f;--icon-folder:#d8b064;--icon-violet:#b9a3e3;--icon-blue:#7fb5e8;
+  --icon-green:#5fd7a1;--icon-red:#f08c95;--danger-text:#f08c95;--danger-bg:#351b20;--warn-text:#e9c062;--ok-text:#34d399;
+  --terminal-bg:#060908;--card-radius:12px
+}
+/* Window chrome */
+:root[data-theme=emerald] .app-shell :is(.titlebar,.menubar,.quick-row,.side-rail,.statusbar){background:var(--chrome)}
+:root[data-theme=emerald] .app-shell .toolbar{background:linear-gradient(180deg,#0c1210,#0a0f0d);border-bottom:1px solid var(--line)}
+:root[data-theme=emerald] .app-shell .tool-button{border-radius:10px}
+:root[data-theme=emerald] .app-shell .tool-button.selected{background:var(--accent-bg);box-shadow:inset 0 0 0 1px #1f6b4f}
+:root[data-theme=emerald] .app-shell .tool-button.selected .tool-icon{color:var(--accent)}
+:root[data-theme=emerald] .menu-popup{border-radius:12px}
+:root[data-theme=emerald] .menu-popup button{border-radius:8px}
+
+/* Tabs as pills */
+:root[data-theme=emerald] .quick-row .tabbar{gap:6px;padding:3px 8px;align-items:center}
+:root[data-theme=emerald] .quick-row .tab{height:24px;border:1px solid var(--line);border-radius:999px;background:var(--panel);min-width:110px}
+:root[data-theme=emerald] .quick-row .tab.active{background:var(--accent-bg);border-color:#1f6b4f;color:var(--white)}
+:root[data-theme=emerald] .quick-row .tab.active .tab-label svg{color:var(--accent)}
+:root[data-theme=emerald] .quick-row .tab-close{border-radius:999px;height:18px;width:18px}
+:root[data-theme=emerald] .quick-row .home-tab{border-radius:999px}
+
+/* Connection list as cards */
+:root[data-theme=emerald] .sidebar{background:var(--panel)}
+:root[data-theme=emerald] .connection-panel .customer-heading{border-radius:10px;margin:2px 8px}
+:root[data-theme=emerald] .connection-panel .customer-heading .folder-heading{padding-left:10px}
+:root[data-theme=emerald] .connection-panel .folder-connections{display:flex;flex-direction:column;gap:4px;padding:3px 8px 6px 22px}
+:root[data-theme=emerald] .connection-panel .folder-connections .session-row{height:32px;padding:0 8px 0 10px;border:1px solid var(--line);border-radius:10px;background:var(--raised)}
+:root[data-theme=emerald] .connection-panel .folder-connections .session-row:hover{border-color:#28473b;background:var(--hover)}
+:root[data-theme=emerald] .connection-panel .session-row.selected{background:var(--accent-bg);border-color:#1f6b4f}
+:root[data-theme=emerald] .connection-panel .session-row .session-host{font-size:10.5px}
+:root[data-theme=emerald] :is(.panel-search,.sidebar-search),:root[data-theme=emerald] .quick-connect input{border-radius:10px}
+
+/* Cards, dialogs, fields and buttons */
+:root[data-theme=emerald] :is(.small-dialog,.session-dialog,.compare-dialog,.editor-dialog){border-radius:18px;border-color:#22312b;box-shadow:var(--shadow),0 0 0 1px #34d39914}
+:root[data-theme=emerald] .modal-backdrop{background:#020403b3}
+:root[data-theme=emerald] .button{border-radius:10px}
+:root[data-theme=emerald] .button.primary{background:linear-gradient(180deg,#3ee0a5,#25b884);border-color:#2fc994;color:#04261a}
+:root[data-theme=emerald] .button.primary:hover:not(:disabled){background:linear-gradient(180deg,#5ae9b5,#2fc994);color:#04261a}
+:root[data-theme=emerald] .button.secondary{background:var(--raised);border-color:var(--line)}
+:root[data-theme=emerald] .dialog-body input:not([type=checkbox]):not([type=range]),:root[data-theme=emerald] .dialog-body select{border-radius:9px}
+:root[data-theme=emerald] :is(.home-action,.recent-table-wrap,.theme-options>button,.protocol-grid>button,.ops-table,.sync-table,.update-notes,.history-list){border-radius:var(--card-radius)}
+:root[data-theme=emerald] .home-action{background:linear-gradient(180deg,#121a17,#0f1513)}
+:root[data-theme=emerald] .home-action:hover:not(:disabled){border-color:#2b8a66;box-shadow:0 0 0 1px #34d39926}
+:root[data-theme=emerald] .recent-table th{background:var(--panel)}
+:root[data-theme=emerald] .recent-table td:last-child{color:var(--accent);font-size:11px;font-weight:600;letter-spacing:.02em}
+:root[data-theme=emerald] .toast{border-radius:14px}
+:root[data-theme=emerald] .ops-pill,:root[data-theme=emerald] .sync-summary>button{border-radius:999px}
+
+/* Monitor bar as telemetry cards */
+:root[data-theme=emerald] .app-shell .remote-monitor{height:38px;gap:6px;padding:4px 8px;background:var(--chrome);border-top:1px solid var(--line)}
+:root[data-theme=emerald] .app-shell .remote-monitor>span{height:28px;padding:0 10px;border:1px solid var(--line);border-right:1px solid var(--line);border-radius:10px;background:var(--raised)}
+:root[data-theme=emerald] .app-shell .remote-monitor>.monitor-host{border-color:#1f6b4f;background:var(--accent-bg)}
+:root[data-theme=emerald] .usage-meter{height:5px;border-radius:999px;background:#22302a}
+:root[data-theme=emerald] .usage-meter i{border-radius:999px;background:linear-gradient(90deg,#1fa774,#34d399)}
+
+/* Terminal: obsidian instead of pure black */
+:root[data-theme=emerald] :is(.terminal-pane,.terminal-surface,.terminal-surface .xterm,.terminal-surface .xterm .xterm-viewport){background-color:var(--terminal-bg)}
+:root[data-theme=emerald] .terminal-pane>.pane-label{color:var(--accent)}
+:root[data-theme=emerald] ::-webkit-scrollbar-thumb{background:#22312b}
+:root[data-theme=emerald] :is(.terminal-font-preview,.terminal-highlight-preview){background:var(--terminal-bg);border:1px solid var(--line);border-radius:10px}
+:root[data-theme=emerald] .quick-row .home-tab{min-width:38px;width:38px;justify-content:center}
+:root[data-theme=emerald] .connection-panel .tree-root{width:calc(100% - 16px);border-radius:10px;margin:2px 8px}
